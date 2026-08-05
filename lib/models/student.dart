@@ -1,0 +1,46 @@
+class Student {
+  final String id; // Firestore document ID
+  final String studentId;
+  final String name;
+  final String course;
+  final String yearLevel;
+  final String qrHash;
+  final String email;
+  final String avatarUrl;
+
+  Student({
+    required this.id,
+    required this.studentId,
+    required this.name,
+    required this.course,
+    required this.yearLevel,
+    required this.qrHash,
+    this.email = '',
+    this.avatarUrl = '',
+  });
+
+  factory Student.fromMap(Map<String, dynamic> data, String documentId) {
+    return Student(
+      id: documentId,
+      studentId: data['student_id'] ?? '',
+      name: data['name'] ?? '',
+      course: data['course'] ?? '',
+      yearLevel: data['year_level'] ?? '',
+      qrHash: data['qr_hash'] ?? '',
+      email: data['email'] ?? '',
+      avatarUrl: data['avatar_url'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'student_id': studentId,
+      'name': name,
+      'course': course,
+      'year_level': yearLevel,
+      'qr_hash': qrHash,
+      'email': email,
+      'avatar_url': avatarUrl,
+    };
+  }
+}

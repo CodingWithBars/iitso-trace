@@ -1,0 +1,46 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Check if the user is an admin
+    function isAdmin() {
+      return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+    
+    // Admins have full access to everything else
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Allow admins to read their own document, and allow master admin to create it
+    match /admins/{adminId} {
+      allow read: if request.auth != null && (request.auth.uid == adminId || isAdmin());
+      allow write: if isAdmin() || (request.auth != null && request.auth.uid == adminId && request.auth.token.email == 'iitsoofficer@dorsu.bc');
+    }
+    
+    // Publicly readable collections (used by landing screen stats and student dashboards)
+    match /events/{eventId} { allow read: if true; }
+    match /funds/{fundId} { allow read: if true; }
+    match /announcements/{annId} { allow read: if true; }
+    match /attendance/{attId} { allow read: if true; }
+    
+    // Students can register (create) and read profiles
+    match /students/{studentId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true; // Students might update their own profile? Keep open for now to avoid breaking.
+    }
+    
+    // ID Claims can be created by students
+    match /id_claims/{claimId} {
+      allow read: if true;
+      allow create: if true;
+    }
+    
+    // Allow anyone to create activity logs (e.g. for registration events)
+    match /activity_logs/{logId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+  }
+}
