@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
 import 'package:auto_size_text/auto_size_text.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../theme/app_theme.dart';
 import '../../services/student_session_service.dart';
@@ -260,10 +261,17 @@ class HeroSection extends ConsumerWidget {
           child: GoldButton(
             label: 'Download Android APK',
             icon: Icons.android_rounded,
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('APK Download link coming soon!')),
-              );
+            onPressed: () async {
+              final uri = Uri.parse('https://tinyurl.com/mtptean6');
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              } else {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Could not open download link.')),
+                  );
+                }
+              }
             },
           ),
         ),
