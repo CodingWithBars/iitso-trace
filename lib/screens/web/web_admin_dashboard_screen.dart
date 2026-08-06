@@ -1645,7 +1645,7 @@ class _WebAdminDashboardScreenState
                                     return false;
                                 }
                                 if (selectedEvent != null &&
-                                    data['eventId'] != selectedEvent)
+                                    data['event_id'] != selectedEvent)
                                   return false;
                                 return true;
                               }).toList();
@@ -1694,7 +1694,7 @@ class _WebAdminDashboardScreenState
                                     return false;
                                 }
                                 if (selectedEvent != null &&
-                                    data['eventId'] != selectedEvent)
+                                    data['event_id'] != selectedEvent)
                                   return false;
                                 return true;
                               }).toList();
@@ -2103,7 +2103,7 @@ class _WebAdminDashboardScreenState
                       'amount': double.tryParse(amtCtrl.text) ?? 0,
                       'date': FieldValue.serverTimestamp(),
                       'proof_images_urls': imageUrls,
-                      'eventId': selectedEventId,
+                      'event_id': selectedEventId,
                     });
                 await ActivityLogService.log(
                   action: 'fund_${type}_added',

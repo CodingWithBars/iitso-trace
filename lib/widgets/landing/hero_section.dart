@@ -302,18 +302,9 @@ class HeroSection extends ConsumerWidget {
 
         var docs = snap.data!.docs.toList();
 
-        final now = DateTime.now();
-        final yesterdayMidnight = DateTime(
-          now.year,
-          now.month,
-          now.day,
-        ).subtract(const Duration(days: 1));
-        docs = docs.where((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          final date = (data['date'] as Timestamp?)?.toDate();
-          if (date == null) return false;
-          return date.isAfter(yesterdayMidnight);
-        }).toList();
+        // We remove the strict yesterday check since events can span multiple days 
+        // or be manually marked as 'ongoing' by the admin. The query already 
+        // filters for 'ongoing' and 'upcoming' statuses.
 
         if (docs.isEmpty) {
           return Padding(

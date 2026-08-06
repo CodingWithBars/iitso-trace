@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../theme/app_theme.dart';
 import '../../models/event.dart';
+import '../../screens/event_details_full_screen.dart';
 import 'web_landing_helpers.dart';
 
 class EventsSection extends StatelessWidget {
@@ -57,6 +58,18 @@ class EventsSection extends StatelessWidget {
                       ),
                     );
                   }
+                  
+                  if (snap.hasError) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(40),
+                        child: Text(
+                          'Error loading events: ${snap.error}',
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    );
+                  }
 
                   final docs = (snap.data?.docs ?? []).where((doc) {
                     final data = doc.data() as Map<String, dynamic>;
@@ -89,7 +102,7 @@ class EventsSection extends StatelessWidget {
                             width:
                                 (constraints.maxWidth - hPad * 2 - 20) /
                                 2.clamp(1, 2),
-                            child: _eventCard(data),
+                            child: _eventCard(context, data),
                           );
                         }).toList(),
                       ),
@@ -102,7 +115,7 @@ class EventsSection extends StatelessWidget {
                           final data = doc.data() as Map<String, dynamic>;
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 16),
-                            child: _eventCard(data),
+                            child: _eventCard(context, data),
                           );
                         }).toList(),
                       ),
@@ -117,7 +130,14 @@ class EventsSection extends StatelessWidget {
     );
   }
 
-  Widget _eventCard(Map<String, dynamic> data) {
+  void _showEventDetails(BuildContext context, Event event) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => EventDetailsFullScreen(event: event)),
+    );
+  }
+
+  Widget _eventCard(BuildContext context, Map<String, dynamic> data) {
     final event = Event.fromMap(data, '');
     Color borderColor;
     Color badgeColor;
@@ -156,9 +176,13 @@ class EventsSection extends StatelessWidget {
         ],
       ),
       clipBehavior: Clip.hardEdge,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _showEventDetails(context, event),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
           if (event.bannerUrl.isNotEmpty)
             AspectRatio(
               aspectRatio: 16 / 9,
@@ -267,6 +291,8 @@ class EventsSection extends StatelessWidget {
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }

@@ -48,10 +48,7 @@ class StatsBar extends StatelessWidget {
                   child: Row(
                     children: [
                       Expanded(
-                        child: _statItem(
-                          studentCount.toString(),
-                          'Registered\nStudents',
-                        ),
+                        child: _statItem(studentCount.toString(), 'Students'),
                       ),
                       _statDivider(),
                       Expanded(

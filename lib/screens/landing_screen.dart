@@ -14,6 +14,7 @@ import '../widgets/landing/stats_bar.dart';
 import '../widgets/landing/announcements_section.dart';
 import '../widgets/landing/transparency_section.dart';
 import '../widgets/landing/landing_footer.dart';
+import '../widgets/web_landing/events_section.dart';
 
 class LandingScreen extends ConsumerStatefulWidget {
   const LandingScreen({super.key});
@@ -94,6 +95,7 @@ class _LandingScreenState extends ConsumerState<LandingScreen> {
             children: [
               HeroSection(isWide: isWide),
               const StatsBar(),
+              const EventsSection(),
               AnnouncementsSection(isWide: isWide),
               TransparencySection(isWide: isWide),
               const LandingFooter(),
