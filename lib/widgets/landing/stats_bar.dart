@@ -70,7 +70,7 @@ class StatsBar extends StatelessWidget {
                                   child: Text(
                                     '₱${_formatAmount(totalIncome)}',
                                     style: GoogleFonts.inter(
-                                      fontSize: 26,
+                                      fontSize: 20,
                                       fontWeight: FontWeight.w900,
                                       color: Colors.white,
                                     ),
