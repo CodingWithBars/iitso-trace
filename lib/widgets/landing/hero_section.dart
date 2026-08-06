@@ -133,24 +133,13 @@ class HeroSection extends ConsumerWidget {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        onPressed: () {
-                          final studentId = ref
-                              .read(studentSessionProvider)
-                              .valueOrNull;
-                          final isLoggedIn =
-                              studentId != null && studentId.isNotEmpty;
-                          if (isLoggedIn) {
-                            context.push('/student/summary/$studentId');
-                          } else {
-                            context.push('/dashboard');
-                          }
-                        },
+                        onPressed: () => context.push('/dashboard'),
                         icon: const Icon(
                           Icons.person_search_rounded,
                           color: TraceColors.white,
                         ),
                         label: Text(
-                          'My Attendance',
+                          'Search Student',
                           style: GoogleFonts.inter(
                             color: TraceColors.white,
                             fontWeight: FontWeight.w600,

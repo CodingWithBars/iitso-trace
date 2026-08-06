@@ -98,62 +98,55 @@ class _StudentDashboardScreenState
     return Scaffold(
       backgroundColor: TraceColors.offWhite,
       appBar: TraceAppBar(
-        title: 'My Attendance',
+        title: 'Search Student',
         actions: [
           Consumer(
             builder: (context, ref, _) {
+              final authService = ref.watch(authServiceProvider);
+              final isAdmin = authService.isLoggedIn;
+
+              if (isAdmin) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: IconButton(
+                    onPressed: () => context.push('/admin/dashboard'),
+                    icon: const Icon(
+                      Icons.admin_panel_settings_outlined,
+                      color: TraceColors.gold,
+                      size: 20,
+                    ),
+                    tooltip: 'Admin Dashboard',
+                  ),
+                );
+              }
+
               final sessionAsync = ref.watch(studentSessionProvider);
               final studentId = sessionAsync.valueOrNull;
-              final isLoggedIn = studentId != null && studentId.isNotEmpty;
+              final isStudentLoggedIn =
+                  studentId != null && studentId.isNotEmpty;
 
-              if (isLoggedIn) {
-                return TextButton.icon(
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: TextButton.icon(
                   onPressed: () {
-                    ref.read(studentSessionProvider.notifier).logout();
-                    context.go('/');
+                    if (isStudentLoggedIn) {
+                      context.push('/student/id/$studentId');
+                    } else {
+                      context.push('/student-login');
+                    }
                   },
-                  icon: const Icon(
-                    Icons.logout,
+                  icon: Icon(
+                    isStudentLoggedIn ? Icons.badge_outlined : Icons.login,
                     color: TraceColors.gold,
                     size: 18,
                   ),
                   label: Text(
-                    'Logout',
+                    isStudentLoggedIn ? 'My ID' : 'Login',
                     style: GoogleFonts.inter(
                       color: TraceColors.gold,
                       fontSize: 13,
+                      fontWeight: FontWeight.w600,
                     ),
-                  ),
-                );
-              }
-              return const SizedBox();
-            },
-          ),
-          Consumer(
-            builder: (context, ref, _) {
-              final sessionAsync = ref.watch(studentSessionProvider);
-              final studentId = sessionAsync.valueOrNull;
-              final isLoggedIn = studentId != null && studentId.isNotEmpty;
-
-              if (isLoggedIn) {
-                return const SizedBox();
-              }
-
-              return TextButton.icon(
-                onPressed: () {
-                  context.push('/student-login');
-                },
-                icon: const Icon(
-                  Icons.login,
-                  color: TraceColors.gold,
-                  size: 18,
-                ),
-                label: Text(
-                  'Login',
-                  style: GoogleFonts.inter(
-                    color: TraceColors.gold,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
               );
@@ -281,7 +274,7 @@ class _StudentDashboardScreenState
           ),
           const SizedBox(height: 16),
           Text(
-            'Search Your Records',
+            'Student Records',
             style: GoogleFonts.inter(
               fontSize: 18,
               fontWeight: FontWeight.w700,
@@ -290,7 +283,7 @@ class _StudentDashboardScreenState
           ),
           const SizedBox(height: 8),
           Text(
-            'Enter your Student ID above to view your\nattendance history for all events.',
+            'Enter Student ID above to view \nattendance history for all events.',
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(fontSize: 14, color: TraceColors.medGrey),
           ),

@@ -127,7 +127,7 @@ class HeroSection extends StatelessWidget {
             MouseRegion(
               cursor: SystemMouseCursors.click,
               child: GestureDetector(
-                onTap: () => context.go('/student-login'),
+                onTap: () => context.go('/dashboard'),
                 child: SizedBox(
                   width: 250,
                   child: Container(
@@ -150,13 +150,13 @@ class HeroSection extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Icon(
-                          Icons.login_rounded,
+                          Icons.person_search_rounded,
                           color: TraceColors.navyBlue,
                           size: 22,
                         ),
                         const SizedBox(width: 10),
                         Text(
-                          'Login',
+                          'Search Student',
                           style: GoogleFonts.inter(
                             color: TraceColors.navyBlue,
                             fontWeight: FontWeight.w800,
