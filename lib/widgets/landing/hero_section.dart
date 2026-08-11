@@ -121,12 +121,14 @@ class HeroSection extends ConsumerWidget {
               final isMobile = constraints.maxWidth < 600;
               final studentId = ref.watch(studentSessionProvider).valueOrNull;
               final isLoggedInStudent = studentId != null && studentId.isNotEmpty;
+              final isAdmin = ref.watch(authServiceProvider).isLoggedIn;
+              final isLoggedIn = isLoggedInStudent || isAdmin;
 
               if (isMobile) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (!isLoggedInStudent) ...[
+                    if (!isLoggedIn) ...[
                       GoldButton(
                         label: 'Register for QR Code',
                         icon: Icons.qr_code_2_rounded,
@@ -167,7 +169,7 @@ class HeroSection extends ConsumerWidget {
               } else {
                 return Row(
                   children: [
-                    if (!isLoggedInStudent) ...[
+                    if (!isLoggedIn) ...[
                       Expanded(
                         child: GoldButton(
                           label: 'Register for QR Code',

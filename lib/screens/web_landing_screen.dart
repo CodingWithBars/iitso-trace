@@ -165,7 +165,8 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
             ),
             SizedBox(width: isSmallMobile ? 4 : 10),
           ],
-          _registerButton(context, small: !isWide || isSmallMobile),
+          if (!isLoggedInStudent && !isAdmin)
+            _registerButton(context, small: !isWide || isSmallMobile),
         ],
       ),
     );
