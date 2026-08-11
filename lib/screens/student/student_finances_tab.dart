@@ -10,8 +10,15 @@ import '../../services/student_service.dart';
 
 class StudentFinancesTab extends StatefulWidget {
   final String studentId;
+  final int initialTabIndex;
+  final bool hideInnerTabBar;
 
-  const StudentFinancesTab({super.key, required this.studentId});
+  const StudentFinancesTab({
+    super.key,
+    required this.studentId,
+    this.initialTabIndex = 0,
+    this.hideInnerTabBar = false,
+  });
 
   @override
   State<StudentFinancesTab> createState() => _StudentFinancesTabState();
@@ -27,8 +34,20 @@ class _StudentFinancesTabState extends State<StudentFinancesTab>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTabIndex.clamp(0, 1),
+    );
     _loadData();
+  }
+
+  @override
+  void didUpdateWidget(StudentFinancesTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialTabIndex != widget.initialTabIndex) {
+      _tabController.animateTo(widget.initialTabIndex.clamp(0, 1));
+    }
   }
 
   @override
@@ -74,29 +93,31 @@ class _StudentFinancesTabState extends State<StudentFinancesTab>
 
     return Column(
       children: [
-        // Tab switcher
-        Container(
-          decoration: BoxDecoration(
-            color: TraceColors.lightGrey.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          padding: const EdgeInsets.all(4),
-          child: TabBar(
-            controller: _tabController,
-            indicator: BoxDecoration(
-              color: TraceColors.navyBlue,
-              borderRadius: BorderRadius.circular(8),
+        // Tab switcher (only rendered if hideInnerTabBar is false)
+        if (!widget.hideInnerTabBar) ...[
+          Container(
+            decoration: BoxDecoration(
+              color: TraceColors.lightGrey.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(12),
             ),
-            labelColor: Colors.white,
-            unselectedLabelColor: TraceColors.navyBlue,
-            labelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
-            tabs: const [
-              Tab(text: 'My Dues & Fees'),
-              Tab(text: 'Org Treasury'),
-            ],
+            padding: const EdgeInsets.all(4),
+            child: TabBar(
+              controller: _tabController,
+              indicator: BoxDecoration(
+                color: TraceColors.navyBlue,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              labelColor: Colors.white,
+              unselectedLabelColor: TraceColors.navyBlue,
+              labelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+              tabs: const [
+                Tab(text: 'My Dues & Fees'),
+                Tab(text: 'Org Treasury'),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
+          const SizedBox(height: 16),
+        ],
 
         Expanded(
           child: TabBarView(

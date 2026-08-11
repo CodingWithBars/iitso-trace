@@ -113,6 +113,23 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
           ],
           if (isLoggedInStudent) ...[
             TextButton.icon(
+              onPressed: () => context.push('/student/summary/$studentId'),
+              icon: const Icon(
+                Icons.space_dashboard_rounded,
+                color: TraceColors.gold,
+                size: 18,
+              ),
+              label: Text(
+                'Student Portal',
+                style: GoogleFonts.inter(
+                  color: const Color(0xFFFFD700),
+                  fontWeight: FontWeight.w700,
+                  fontSize: isSmallMobile ? 12 : 13,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton.icon(
               onPressed: () => context.push('/student/id/$studentId'),
               icon: const Icon(
                 Icons.badge_outlined,

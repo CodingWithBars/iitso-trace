@@ -119,17 +119,22 @@ class HeroSection extends ConsumerWidget {
           LayoutBuilder(
             builder: (context, constraints) {
               final isMobile = constraints.maxWidth < 600;
+              final studentId = ref.watch(studentSessionProvider).valueOrNull;
+              final isLoggedInStudent = studentId != null && studentId.isNotEmpty;
+
               if (isMobile) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    GoldButton(
-                      label: 'Register for QR Code',
-                      icon: Icons.qr_code_2_rounded,
-                      onPressed: () => context.push('/register'),
-                      fullWidth: true,
-                    ),
-                    const SizedBox(height: 12),
+                    if (!isLoggedInStudent) ...[
+                      GoldButton(
+                        label: 'Register for QR Code',
+                        icon: Icons.qr_code_2_rounded,
+                        onPressed: () => context.push('/register'),
+                        fullWidth: true,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
@@ -162,35 +167,26 @@ class HeroSection extends ConsumerWidget {
               } else {
                 return Row(
                   children: [
-                    Expanded(
-                      child: GoldButton(
-                        label: 'Register for QR Code',
-                        icon: Icons.qr_code_2_rounded,
-                        onPressed: () => context.push('/register'),
-                        fullWidth: true,
+                    if (!isLoggedInStudent) ...[
+                      Expanded(
+                        child: GoldButton(
+                          label: 'Register for QR Code',
+                          icon: Icons.qr_code_2_rounded,
+                          onPressed: () => context.push('/register'),
+                          fullWidth: true,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 16),
+                      const SizedBox(width: 16),
+                    ],
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () {
-                          final studentId = ref
-                              .read(studentSessionProvider)
-                              .valueOrNull;
-                          final isLoggedIn =
-                              studentId != null && studentId.isNotEmpty;
-                          if (isLoggedIn) {
-                            context.push('/student/summary/$studentId');
-                          } else {
-                            context.push('/dashboard');
-                          }
-                        },
+                        onPressed: () => context.push('/dashboard'),
                         icon: const Icon(
                           Icons.person_search_rounded,
                           color: TraceColors.white,
                         ),
                         label: Text(
-                          'My Attendance',
+                          'Search Student',
                           style: GoogleFonts.inter(
                             color: TraceColors.white,
                             fontWeight: FontWeight.w600,
@@ -214,25 +210,37 @@ class HeroSection extends ConsumerWidget {
             },
           ),
         if (!kIsWeb) ...[
-          const SizedBox(height: 12),
-          Center(
-            child: TextButton.icon(
-              onPressed: () => context.push('/claim-id'),
-              icon: const Icon(
-                Icons.verified_user_outlined,
-                size: 16,
-                color: TraceColors.gold,
-              ),
-              label: Text(
-                'Claim My Student ID',
-                style: GoogleFonts.inter(
-                  color: TraceColors.gold,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  decorationColor: TraceColors.gold,
-                ),
-              ),
-            ),
+          Consumer(
+            builder: (context, ref, _) {
+              final studentId = ref.watch(studentSessionProvider).valueOrNull;
+              final isLoggedInStudent = studentId != null && studentId.isNotEmpty;
+              if (isLoggedInStudent) return const SizedBox();
+
+              return Column(
+                children: [
+                  const SizedBox(height: 12),
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: () => context.push('/claim-id'),
+                      icon: const Icon(
+                        Icons.verified_user_outlined,
+                        size: 16,
+                        color: TraceColors.gold,
+                      ),
+                      label: Text(
+                        'Claim My Student ID',
+                        style: GoogleFonts.inter(
+                          color: TraceColors.gold,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          decorationColor: TraceColors.gold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ],

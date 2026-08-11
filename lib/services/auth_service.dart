@@ -104,27 +104,17 @@ class AuthService {
   }
 
   Future<void> signOut() async {
-    if (currentUser != null) {
+    final uid = currentUser?.uid;
+    if (uid != null) {
       try {
-        final doc = await FirestoreService.admins.doc(currentUser!.uid).get();
-        String adminName = 'Admin';
-        if (doc.exists) {
-          final data = doc.data() as Map<String, dynamic>?;
-          if (data != null && data.containsKey('name')) {
-            adminName = data['name'];
-          }
-        }
-
-        await ActivityLogService.log(
+        ActivityLogService.log(
           action: 'Logout',
           message: 'Admin logged out',
           entityType: 'admin',
-          entityId: currentUser!.uid,
-          actorName: adminName,
-        );
-      } catch (e) {
-        // Continue with sign out even if logging fails
-      }
+          entityId: uid,
+          actorName: 'Admin',
+        ).catchError((_) {});
+      } catch (_) {}
     }
     await _auth.signOut();
   }

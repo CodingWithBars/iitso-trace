@@ -222,22 +222,62 @@ class FinancialService {
   // Organization Financial Transparency Ledger
   // ---------------------------------------------------------------------------
 
-  /// Fetch all organization income & expense transactions
+  /// Fetch all organization income & expense transactions with smart deduplication
   static Future<List<OrgTransaction>> getOrgTransactions() async {
     try {
-      final snap = await _db.collection('org_transactions').get();
-      final list = snap.docs.map((doc) => OrgTransaction.fromMap(doc.data(), doc.id)).toList();
-      list.sort((a, b) => b.date.compareTo(a.date));
-      return list;
+      final allDocs = <String, DocumentSnapshot<Map<String, dynamic>>>{};
+
+      // 1. Fetch from 'funds' collection (Primary Treasury Ledger)
+      final snapFunds = await _db.collection('funds').get();
+      for (final doc in snapFunds.docs) {
+        allDocs[doc.id] = doc;
+      }
+
+      // 2. Fetch from legacy 'org_transactions' collection only if not present in funds
+      final snapOrg = await _db.collection('org_transactions').get();
+      for (final doc in snapOrg.docs) {
+        if (!allDocs.containsKey(doc.id)) {
+          allDocs[doc.id] = doc;
+        }
+      }
+
+      final list = <OrgTransaction>[];
+      for (final doc in allDocs.values) {
+        final data = doc.data();
+        if (data != null) {
+          try {
+            list.add(OrgTransaction.fromMap(data, doc.id));
+          } catch (err) {
+            debugPrint('[FinancialService] Error parsing doc ${doc.id}: $err');
+          }
+        }
+      }
+
+      // 3. Smart Deduplication: collapse records with identical title, amount, type & minute
+      final uniqueList = <OrgTransaction>[];
+      final seenKeys = <String>{};
+
+      for (final tx in list) {
+        final key = '${tx.title.trim().toLowerCase()}_${tx.amount}_${tx.type}_${tx.date.year}_${tx.date.month}_${tx.date.day}_${tx.date.hour}_${tx.date.minute}';
+        if (!seenKeys.contains(key)) {
+          seenKeys.add(key);
+          uniqueList.add(tx);
+        }
+      }
+
+      uniqueList.sort((a, b) => b.date.compareTo(a.date));
+      return uniqueList;
     } catch (e) {
       debugPrint('[FinancialService] Error fetching org transactions: $e');
       return [];
     }
   }
 
-  /// Add a financial transaction (income or expense) to the org ledger
+  /// Add a financial transaction (income or expense) to the org ledger funds collection
   static Future<void> addOrgTransaction(OrgTransaction transaction) async {
-    await _db.collection('org_transactions').add(transaction.toMap());
+    final map = transaction.toMap();
+    map['description'] = transaction.title;
+    await _db.collection('funds').add(map);
   }
 
   /// Delete obligation (Admin override)

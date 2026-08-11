@@ -13,6 +13,8 @@ import 'payment_scanner_modal.dart';
 import 'student_obligations_list_screen.dart';
 import 'org_cashflow_logs_screen.dart';
 
+import 'record_manual_payment_screen.dart';
+
 class FinancialDashboardScreen extends ConsumerStatefulWidget {
   const FinancialDashboardScreen({super.key});
 
@@ -231,7 +233,15 @@ class _FinancialDashboardScreenState
             subtitle: 'Manual payment collection',
             icon: Icons.point_of_sale_rounded,
             color: TraceColors.navyBlue,
-            onTap: _showRecordPaymentDialog,
+            onTap: () async {
+              final res = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RecordManualPaymentScreen()),
+              );
+              if (res == true) {
+                _loadData();
+              }
+            },
           ),
           _actionCard(
             title: 'Student Obligations',
@@ -376,135 +386,7 @@ class _FinancialDashboardScreenState
   // Dialog Modals
   // ---------------------------------------------------------------------------
 
-  void _showRecordPaymentDialog() {
-    final studentIdCtrl = TextEditingController();
-    final amountCtrl = TextEditingController();
-    final refCtrl = TextEditingController();
-    String method = 'cash';
-    StudentObligation? selectedOb;
 
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setDlgState) {
-            final unpaidObs = _obligations
-                .where((o) => !o.isFullyPaid)
-                .where((o) =>
-                    studentIdCtrl.text.isEmpty ||
-                    o.studentId.toLowerCase().contains(studentIdCtrl.text.toLowerCase()) ||
-                    o.studentName.toLowerCase().contains(studentIdCtrl.text.toLowerCase()))
-                .toList();
-
-            return AlertDialog(
-              title: Text('Record Cash/GCash Payment', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: studentIdCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Search Student ID or Name',
-                        prefixIcon: Icon(Icons.search),
-                      ),
-                      onChanged: (_) => setDlgState(() {}),
-                    ),
-                    const SizedBox(height: 12),
-
-                    DropdownButtonFormField<StudentObligation>(
-                      initialValue: selectedOb,
-                      decoration: const InputDecoration(labelText: 'Select Unpaid Dues / Obligation'),
-                      items: unpaidObs.map((ob) {
-                        return DropdownMenuItem(
-                          value: ob,
-                          child: Text('${ob.studentName} — ${ob.title} (Bal: ₱${ob.remainingBalance.toStringAsFixed(0)})', overflow: TextOverflow.ellipsis),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        setDlgState(() {
-                          selectedOb = val;
-                          if (val != null) {
-                            amountCtrl.text = val.remainingBalance.toStringAsFixed(0);
-                          }
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-
-                    TextField(
-                      controller: amountCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Amount Received (₱)',
-                        prefixIcon: Icon(Icons.payments_outlined),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    DropdownButtonFormField<String>(
-                      initialValue: method,
-                      decoration: const InputDecoration(labelText: 'Payment Method'),
-                      items: const [
-                        DropdownMenuItem(value: 'cash', child: Text('Cash')),
-                        DropdownMenuItem(value: 'gcash', child: Text('GCash')),
-                        DropdownMenuItem(value: 'bank_transfer', child: Text('Bank Transfer')),
-                      ],
-                      onChanged: (val) => setDlgState(() => method = val ?? 'cash'),
-                    ),
-                    const SizedBox(height: 12),
-
-                    TextField(
-                      controller: refCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Receipt / Ref # (Optional)',
-                        hintText: 'e.g. OR-1092 / GCash Ref 10023',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: TraceColors.success),
-                  onPressed: () async {
-                    if (selectedOb == null) return;
-                    final amt = double.tryParse(amountCtrl.text) ?? 0.0;
-                    if (amt <= 0) return;
-
-                    final user = ref.read(authServiceProvider).currentUser;
-                    final adminEmail = user?.email ?? 'Treasurer Admin';
-
-                    await FinancialService.recordPayment(
-                      obligationId: selectedOb!.id,
-                      studentId: selectedOb!.studentId,
-                      amountPaid: amt,
-                      paymentMethod: method,
-                      referenceNo: refCtrl.text.trim(),
-                      recordedBy: adminEmail,
-                    );
-
-                    if (!ctx.mounted) return;
-                    Navigator.pop(ctx);
-                    _loadData();
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Payment recorded successfully!'), backgroundColor: TraceColors.success),
-                    );
-                  },
-                  child: const Text('Save Payment', style: TextStyle(color: Colors.white)),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
 
   void _showCreateDuesDialog() {
     final titleCtrl = TextEditingController();

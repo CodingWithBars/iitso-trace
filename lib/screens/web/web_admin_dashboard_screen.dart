@@ -122,7 +122,7 @@ class _WebAdminDashboardScreenState
                                 onPressed: () async {
                                   await authService.signOut();
                                   if (!context.mounted) return;
-                                  context.go('/admin/login');
+                                  context.go('/');
                                 },
                               ),
                             ],

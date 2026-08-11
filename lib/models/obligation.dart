@@ -142,15 +142,42 @@ class OrgTransaction {
   });
 
   factory OrgTransaction.fromMap(Map<String, dynamic> data, String docId) {
+    final typeStr = (data['type'] ?? 'expense').toString().toLowerCase();
+    final normalizedType = (typeStr == 'income' || typeStr == 'contribution') ? 'income' : 'expense';
+
+    final rawTitle = data['title'] ?? data['description'] ?? data['notes'] ?? 'Org Transaction';
+
+    DateTime parsedDate = DateTime.now();
+    final rawDate = data['date'] ?? data['created_at'];
+    if (rawDate != null) {
+      if (rawDate is Timestamp) {
+        parsedDate = rawDate.toDate();
+      } else if (rawDate is String) {
+        parsedDate = DateTime.tryParse(rawDate) ?? DateTime.now();
+      } else if (rawDate is int) {
+        parsedDate = DateTime.fromMillisecondsSinceEpoch(rawDate);
+      }
+    }
+
+    double parsedAmount = 0.0;
+    final rawAmount = data['amount'];
+    if (rawAmount != null) {
+      if (rawAmount is num) {
+        parsedAmount = rawAmount.toDouble();
+      } else if (rawAmount is String) {
+        parsedAmount = double.tryParse(rawAmount) ?? 0.0;
+      }
+    }
+
     return OrgTransaction(
       id: docId,
-      title: data['title'] ?? '',
-      type: data['type'] ?? 'expense',
-      category: data['category'] ?? 'other',
-      amount: (data['amount'] as num?)?.toDouble() ?? 0.0,
-      date: data['date'] != null ? (data['date'] as Timestamp).toDate() : DateTime.now(),
-      receiptUrl: data['receipt_url'],
-      recordedBy: data['recorded_by'] ?? 'Treasurer',
+      title: rawTitle.toString(),
+      type: normalizedType,
+      category: (data['category'] ?? (normalizedType == 'income' ? 'contributions' : 'other')).toString(),
+      amount: parsedAmount,
+      date: parsedDate,
+      receiptUrl: data['receipt_url'] ?? data['proof_image_base64'],
+      recordedBy: (data['recorded_by'] ?? data['recordedBy'] ?? 'Treasurer').toString(),
     );
   }
 

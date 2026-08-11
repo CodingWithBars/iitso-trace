@@ -23,6 +23,7 @@ import 'screens/admin/activity_logs_screen.dart';
 import 'screens/admin/financial_dashboard_screen.dart';
 import 'screens/admin/student_obligations_list_screen.dart';
 import 'screens/admin/org_cashflow_logs_screen.dart';
+import 'screens/admin/record_manual_payment_screen.dart';
 import 'screens/claim_id_screen.dart';
 import 'screens/privacy_policy_screen.dart';
 import 'screens/terms_conditions_screen.dart';
@@ -51,11 +52,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Protect admin dashboard and scanner — require login
       if ((isAdminRoute || isScannerRoute) && !isLoggedIn) {
         return '/admin/login';
-      }
-
-      // Already logged in, redirect away from login
-      if (state.uri.path == '/admin/login' && isLoggedIn) {
-        return '/admin/dashboard';
       }
 
       return null;
@@ -162,6 +158,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/finances/cashflow',
         builder: (context, state) => const OrgCashflowLogsScreen(),
+      ),
+      GoRoute(
+        path: '/admin/finances/record-payment',
+        builder: (context, state) => const RecordManualPaymentScreen(),
       ),
       GoRoute(
         path: '/admin/logs',

@@ -59,27 +59,53 @@ class _LandingScreenState extends ConsumerState<LandingScreen> {
                     final isLoggedIn =
                         studentId != null && studentId.isNotEmpty;
 
-                    return TextButton.icon(
-                      onPressed: () {
-                        if (isLoggedIn) {
-                          context.push('/student/id/$studentId');
-                        } else {
-                          context.push('/student-login');
-                        }
-                      },
-                      icon: Icon(
-                        isLoggedIn ? Icons.badge_outlined : Icons.login,
-                        color: TraceColors.gold,
-                        size: 18,
-                      ),
-                      label: Text(
-                        isLoggedIn ? 'My ID' : 'Login',
-                        style: GoogleFonts.inter(
-                          color: const Color(0xFFFFD700),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isLoggedIn) ...[
+                          TextButton.icon(
+                            onPressed: () {
+                              context.push('/student/summary/$studentId');
+                            },
+                            icon: const Icon(
+                              Icons.space_dashboard_rounded,
+                              color: TraceColors.gold,
+                              size: 18,
+                            ),
+                            label: Text(
+                              'Portal',
+                              style: GoogleFonts.inter(
+                                color: const Color(0xFFFFD700),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                        ],
+                        TextButton.icon(
+                          onPressed: () {
+                            if (isLoggedIn) {
+                              context.push('/student/id/$studentId');
+                            } else {
+                              context.push('/student-login');
+                            }
+                          },
+                          icon: Icon(
+                            isLoggedIn ? Icons.badge_outlined : Icons.login,
+                            color: TraceColors.gold,
+                            size: 18,
+                          ),
+                          label: Text(
+                            isLoggedIn ? 'My ID' : 'Login',
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFFFFD700),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     );
                   },
                 ),

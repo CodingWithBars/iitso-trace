@@ -763,96 +763,150 @@ class _WebStudentSummaryScreenState
     return '$h:$m ${dt.hour >= 12 ? 'PM' : 'AM'}';
   }
 
+  int _activeSegment = 0;
+
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        backgroundColor: TraceColors.offWhite,
-        appBar: TraceAppBar(
-          title: 'Student Portal',
-          actions: [
-            Consumer(
-              builder: (context, ref, _) {
-                final sessionAsync = ref.watch(studentSessionProvider);
-                final isLoggedIn =
-                    sessionAsync.valueOrNull != null &&
-                    sessionAsync.valueOrNull!.isNotEmpty;
+    return Scaffold(
+      backgroundColor: TraceColors.offWhite,
+      appBar: TraceAppBar(
+        title: 'Student Portal',
+        actions: [
+          Consumer(
+            builder: (context, ref, _) {
+              final sessionAsync = ref.watch(studentSessionProvider);
+              final isLoggedIn =
+                  sessionAsync.valueOrNull != null &&
+                  sessionAsync.valueOrNull!.isNotEmpty;
 
-                if (isLoggedIn) {
-                  return IconButton(
-                    onPressed: () {
-                      ref.read(studentSessionProvider.notifier).logout();
-                      context.go('/');
-                    },
-                    icon: const Icon(
-                      Icons.logout,
-                      color: TraceColors.gold,
-                      size: 20,
+              if (isLoggedIn) {
+                return IconButton(
+                  onPressed: () {
+                    ref.read(studentSessionProvider.notifier).logout();
+                    context.go('/');
+                  },
+                  icon: const Icon(
+                    Icons.logout,
+                    color: TraceColors.gold,
+                    size: 20,
+                  ),
+                  tooltip: 'Logout',
+                );
+              }
+              return const SizedBox();
+            },
+          ),
+        ],
+      ),
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: _isLoading
+                ? const Padding(
+                    padding: EdgeInsets.all(48),
+                    child: CircularProgressIndicator(
+                      color: TraceColors.royalBlue,
                     ),
-                    tooltip: 'Logout',
-                  );
-                }
-                return const SizedBox();
-              },
-            ),
-          ],
-        ),
-        body: Align(
-          alignment: Alignment.topCenter,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: _isLoading
-                  ? const Padding(
-                      padding: EdgeInsets.all(48),
-                      child: CircularProgressIndicator(
-                        color: TraceColors.royalBlue,
+                  )
+                : _error != null
+                ? _buildErrorCard()
+                : Column(
+                    children: [
+                      _buildSlickSegmentedControl(),
+                      const SizedBox(height: 16),
+                      Expanded(
+                        child: _buildActiveSegmentView(),
                       ),
-                    )
-                  : _error != null
-                  ? _buildErrorCard()
-                  : Column(
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: TraceColors.navyBlue.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.all(4),
-                          child: TabBar(
-                            indicator: BoxDecoration(
-                              color: TraceColors.navyBlue,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            labelColor: Colors.white,
-                            unselectedLabelColor: TraceColors.navyBlue,
-                            labelStyle: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            tabs: const [
-                              Tab(text: 'Attendance'),
-                              Tab(text: 'Finances & Dues'),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Expanded(
-                          child: TabBarView(
-                            children: [
-                              SingleChildScrollView(child: _buildResults()),
-                              StudentFinancesTab(studentId: widget.studentId),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
+                    ],
+                  ),
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildSlickSegmentedControl() {
+    final segments = [
+      {'label': 'Attendance', 'icon': Icons.insights_rounded},
+      {'label': 'My Dues', 'icon': Icons.account_balance_wallet_rounded},
+      {'label': 'Org Ledger', 'icon': Icons.receipt_long_rounded},
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: TraceColors.navyBlue.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Row(
+        children: List.generate(segments.length, (index) {
+          final isSelected = _activeSegment == index;
+          final item = segments[index];
+
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _activeSegment = index),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: isSelected ? TraceColors.navyBlue : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: TraceColors.navyBlue.withValues(alpha: 0.3),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : [],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      item['icon'] as IconData,
+                      size: 15,
+                      color: isSelected ? TraceColors.gold : TraceColors.navyBlue,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      item['label'] as String,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? Colors.white : TraceColors.navyBlue,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildActiveSegmentView() {
+    if (_activeSegment == 0) {
+      return SingleChildScrollView(child: _buildResults());
+    } else if (_activeSegment == 1) {
+      return StudentFinancesTab(
+        studentId: widget.studentId,
+        initialTabIndex: 0,
+        hideInnerTabBar: true,
+      );
+    } else {
+      return StudentFinancesTab(
+        studentId: widget.studentId,
+        initialTabIndex: 1,
+        hideInnerTabBar: true,
+      );
+    }
   }
 }

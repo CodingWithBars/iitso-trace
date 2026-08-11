@@ -121,7 +121,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                                 onPressed: () async {
                                   await authService.signOut();
                                   if (!context.mounted) return;
-                                  context.go('/admin/login');
+                                  context.go('/');
                                 },
                               ),
                             ],
