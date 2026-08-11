@@ -17,7 +17,7 @@ echo "Getting dependencies..."
 flutter pub get
 
 echo "Building Flutter Web..."
-# Using --release for optimized build
-flutter build web --release
+# Using --release and offline-first caching for instant load performance
+flutter build web --release --pwa-strategy=offline-first
 
 echo "Build complete."

@@ -83,11 +83,12 @@ class _ClaimIdScreenState extends State<ClaimIdScreen> {
         reason: _reasonCtrl.text.trim(),
         proofImageUrl: _proofBase64,
       );
-      if (mounted)
+      if (mounted) {
         setState(() {
           _isSubmitting = false;
           _submitted = true;
         });
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -171,9 +172,14 @@ class _ClaimIdScreenState extends State<ClaimIdScreen> {
   }
 
   Widget _buildForm() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Form(
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: TraceCard(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -349,7 +355,10 @@ class _ClaimIdScreenState extends State<ClaimIdScreen> {
           ],
         ),
       ),
-    );
+    ),
+  ),
+),
+);
   }
 
   Widget _sectionLabel(String label) => Padding(

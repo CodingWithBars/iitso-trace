@@ -185,8 +185,9 @@ class CsvReportService {
         double rate = 0.0;
         if (totalEventHours > 0) {
           rate = (attendedHours / totalEventHours) * 100;
-          if (rate > 100)
+          if (rate > 100) {
             rate = 100.0; // Cap at 100% in case they arrived early/left late
+          }
         }
 
         rows.add([

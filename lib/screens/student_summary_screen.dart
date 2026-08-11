@@ -12,6 +12,7 @@ import '../models/event.dart';
 import '../services/event_service.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
+import 'student/student_finances_tab.dart';
 
 class StudentSummaryScreen extends ConsumerStatefulWidget {
   final String studentId;
@@ -298,8 +299,9 @@ class _StudentSummaryScreenState extends ConsumerState<StudentSummaryScreen> {
         final start = DateFormat('HH:mm').parse(event.startTime!);
         final end = DateFormat('HH:mm').parse(event.endTime!);
         totalEventDuration = end.difference(start);
-        if (totalEventDuration.isNegative)
+        if (totalEventDuration.isNegative) {
           totalEventDuration += const Duration(hours: 24);
+        }
 
         if (event.isWholeDay &&
             event.morningTimeOut != null &&
@@ -426,21 +428,27 @@ class _StudentSummaryScreenState extends ConsumerState<StudentSummaryScreen> {
           Expanded(
             child: Column(
               children: [
-                Text(
-                  fmt(totalEventDurationAll),
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: TraceColors.gold,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    fmt(totalEventDurationAll),
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: TraceColors.gold,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  'Total Event',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: TraceColors.medGrey,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'Total Event',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: TraceColors.medGrey,
+                    ),
                   ),
                 ),
               ],
@@ -450,22 +458,28 @@ class _StudentSummaryScreenState extends ConsumerState<StudentSummaryScreen> {
             flex: 2,
             child: Column(
               children: [
-                Text(
-                  fmt(completedDurationAll),
-                  style: GoogleFonts.inter(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w900,
-                    color: TraceColors.success,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    fmt(completedDurationAll),
+                    style: GoogleFonts.inter(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                      color: TraceColors.success,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  'Completed',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: TraceColors.navyBlue,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'Completed',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: TraceColors.navyBlue,
+                    ),
                   ),
                 ),
               ],
@@ -474,21 +488,27 @@ class _StudentSummaryScreenState extends ConsumerState<StudentSummaryScreen> {
           Expanded(
             child: Column(
               children: [
-                Text(
-                  fmt(missedDurationAll),
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: TraceColors.error,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    fmt(missedDurationAll),
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: TraceColors.error,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  'Missed',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: TraceColors.medGrey,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'Missed',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: TraceColors.medGrey,
+                    ),
                   ),
                 ),
               ],
@@ -744,53 +764,91 @@ class _StudentSummaryScreenState extends ConsumerState<StudentSummaryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: TraceColors.offWhite,
-      appBar: TraceAppBar(
-        title: 'Attendance Summary',
-        actions: [
-          Consumer(
-            builder: (context, ref, _) {
-              final sessionAsync = ref.watch(studentSessionProvider);
-              final isLoggedIn =
-                  sessionAsync.valueOrNull != null &&
-                  sessionAsync.valueOrNull!.isNotEmpty;
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: TraceColors.offWhite,
+        appBar: TraceAppBar(
+          title: 'Student Portal',
+          actions: [
+            Consumer(
+              builder: (context, ref, _) {
+                final sessionAsync = ref.watch(studentSessionProvider);
+                final isLoggedIn =
+                    sessionAsync.valueOrNull != null &&
+                    sessionAsync.valueOrNull!.isNotEmpty;
 
-              if (isLoggedIn) {
-                return IconButton(
-                  onPressed: () {
-                    ref.read(studentSessionProvider.notifier).logout();
-                    context.go('/');
-                  },
-                  icon: const Icon(
-                    Icons.logout,
-                    color: TraceColors.gold,
-                    size: 20,
-                  ),
-                  tooltip: 'Logout',
-                );
-              }
-              return const SizedBox();
-            },
-          ),
-        ],
-      ),
-      body: Align(
-        alignment: Alignment.topCenter,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 680),
-            child: _isLoading
-                ? const Padding(
-                    padding: EdgeInsets.all(48),
-                    child: CircularProgressIndicator(
-                      color: TraceColors.royalBlue,
+                if (isLoggedIn) {
+                  return IconButton(
+                    onPressed: () {
+                      ref.read(studentSessionProvider.notifier).logout();
+                      context.go('/');
+                    },
+                    icon: const Icon(
+                      Icons.logout,
+                      color: TraceColors.gold,
+                      size: 20,
                     ),
-                  )
-                : _error != null
-                ? _buildErrorCard()
-                : _buildResults(),
+                    tooltip: 'Logout',
+                  );
+                }
+                return const SizedBox();
+              },
+            ),
+          ],
+        ),
+        body: Align(
+          alignment: Alignment.topCenter,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: _isLoading
+                  ? const Padding(
+                      padding: EdgeInsets.all(48),
+                      child: CircularProgressIndicator(
+                        color: TraceColors.royalBlue,
+                      ),
+                    )
+                  : _error != null
+                  ? _buildErrorCard()
+                  : Column(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: TraceColors.navyBlue.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.all(4),
+                          child: TabBar(
+                            indicator: BoxDecoration(
+                              color: TraceColors.navyBlue,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            labelColor: Colors.white,
+                            unselectedLabelColor: TraceColors.navyBlue,
+                            labelStyle: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            tabs: const [
+                              Tab(text: 'Attendance'),
+                              Tab(text: 'Finances & Dues'),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Expanded(
+                          child: TabBarView(
+                            children: [
+                              SingleChildScrollView(child: _buildResults()),
+                              StudentFinancesTab(studentId: widget.studentId),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
           ),
         ),
       ),

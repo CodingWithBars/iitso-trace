@@ -115,9 +115,9 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen>
               child: FadeTransition(
                 opacity: _fadeAnim,
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 420),
+                    constraints: const BoxConstraints(maxWidth: 520),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -156,7 +156,7 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen>
                         const SizedBox(height: 40),
                         // Login Card
                         Container(
-                          padding: const EdgeInsets.all(32),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(24),
@@ -197,10 +197,12 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen>
                                     prefixIcon: Icon(Icons.email_outlined),
                                   ),
                                   validator: (v) {
-                                    if (v == null || v.isEmpty)
+                                    if (v == null || v.isEmpty) {
                                       return 'Email is required';
-                                    if (!v.contains('@'))
+                                    }
+                                    if (!v.contains('@')) {
                                       return 'Invalid email';
+                                    }
                                     return null;
                                   },
                                 ),

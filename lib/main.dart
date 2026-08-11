@@ -35,16 +35,19 @@ void main() async {
       cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
     );
     await FirestoreService.initialize();
-    await NetworkService.initialize();
 
-    // Initialize notification service but catch any errors (e.g. permission dialogs failing before runApp)
-    try {
-      await NotificationService.initialize();
-    } catch (e) {
-      debugPrint('Notification initialization failed: $e');
-    }
-
+    // Render app UI immediately
     runApp(const ProviderScope(child: TraceApp()));
+
+    // Non-blocking background initializations
+    Future.microtask(() async {
+      await NetworkService.initialize();
+      try {
+        await NotificationService.initialize();
+      } catch (e) {
+        debugPrint('Notification initialization failed: $e');
+      }
+    });
   } catch (e, stackTrace) {
     debugPrint('Initialization error: $e\n$stackTrace');
     runApp(

@@ -264,4 +264,17 @@ class StudentService {
       actorName: 'Admin',
     );
   }
+
+  /// Returns a list of all registered students
+  static Future<List<Student>> getAllStudents() async {
+    try {
+      final snap = await FirestoreService.students.get();
+      return snap.docs
+          .map((d) => Student.fromMap(d.data() as Map<String, dynamic>, d.id))
+          .toList();
+    } catch (e) {
+      debugPrint('Error getting all students: $e');
+      return [];
+    }
+  }
 }

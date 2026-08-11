@@ -393,10 +393,12 @@ class _ManageAdminsScreenState extends ConsumerState<ManageAdminsScreen> {
                     .orderBy('created_at', descending: true)
                     .snapshots(),
                 builder: (ctx, snap) {
-                  if (snap.hasError)
+                  if (snap.hasError) {
                     return Center(child: Text('Error: ${snap.error}'));
-                  if (!snap.hasData)
+                  }
+                  if (!snap.hasData) {
                     return const Center(child: CircularProgressIndicator());
+                  }
 
                   final docs = snap.data!.docs;
                   if (docs.isEmpty) {

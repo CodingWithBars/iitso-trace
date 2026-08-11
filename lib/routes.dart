@@ -20,6 +20,9 @@ import 'screens/admin/attendance_events_screen.dart';
 import 'screens/admin/event_attendance_screen.dart';
 import 'screens/admin/id_claims_screen.dart';
 import 'screens/admin/activity_logs_screen.dart';
+import 'screens/admin/financial_dashboard_screen.dart';
+import 'screens/admin/student_obligations_list_screen.dart';
+import 'screens/admin/org_cashflow_logs_screen.dart';
 import 'screens/claim_id_screen.dart';
 import 'screens/privacy_policy_screen.dart';
 import 'screens/terms_conditions_screen.dart';
@@ -33,6 +36,8 @@ import 'screens/web/web_student_summary_screen.dart';
 import 'screens/web/web_admin_dashboard_screen.dart';
 import 'screens/web/web_scanner_screen.dart';
 
+import 'widgets/desktop_mobile_wrapper.dart';
+
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/',
@@ -42,10 +47,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           state.uri.path.startsWith('/admin') &&
           state.uri.path != '/admin/login';
       final isScannerRoute = state.uri.path == '/scanner';
-
-      // The web version is now fully unlocked to support the same features
-      // and functionalities as the Android mobile version.
-      // (Removed the kIsWeb restrictive redirect)
 
       // Protect admin dashboard and scanner — require login
       if ((isAdminRoute || isScannerRoute) && !isLoggedIn) {
@@ -63,31 +64,40 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Public routes
       GoRoute(
         path: '/',
-        builder: (context, state) =>
-            kIsWeb ? const WebLandingScreen() : const LandingScreen(),
+        builder: (context, state) => kIsWeb
+            ? const DesktopMobileWrapper(child: WebLandingScreen())
+            : const LandingScreen(),
       ),
       GoRoute(path: '/app', builder: (context, state) => const LandingScreen()),
       GoRoute(
         path: '/register',
-        builder: (context, state) =>
-            kIsWeb ? const WebRegistrationScreen() : const RegistrationScreen(),
+        builder: (context, state) => kIsWeb
+            ? const DesktopMobileWrapper(child: WebRegistrationScreen())
+            : const RegistrationScreen(),
       ),
       GoRoute(
         path: '/student-login',
-        builder: (context, state) =>
-            kIsWeb ? const WebStudentLoginScreen() : const StudentLoginScreen(),
+        builder: (context, state) => kIsWeb
+            ? const DesktopMobileWrapper(child: WebStudentLoginScreen())
+            : const StudentLoginScreen(),
       ),
       GoRoute(
         path: '/student/id/:studentId',
         builder: (context, state) => kIsWeb
-            ? WebStudentIdScreen(studentId: state.pathParameters['studentId']!)
+            ? DesktopMobileWrapper(
+                child: WebStudentIdScreen(
+                  studentId: state.pathParameters['studentId']!,
+                ),
+              )
             : StudentIdScreen(studentId: state.pathParameters['studentId']!),
       ),
       GoRoute(
         path: '/student/summary/:studentId',
         builder: (context, state) => kIsWeb
-            ? WebStudentSummaryScreen(
-                studentId: state.pathParameters['studentId']!,
+            ? DesktopMobileWrapper(
+                child: WebStudentSummaryScreen(
+                  studentId: state.pathParameters['studentId']!,
+                ),
               )
             : StudentSummaryScreen(
                 studentId: state.pathParameters['studentId']!,
@@ -114,8 +124,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Admin routes (protected)
       GoRoute(
         path: '/admin/login',
-        builder: (context, state) =>
-            kIsWeb ? const WebAdminLoginScreen() : const AdminLoginScreen(),
+        builder: (context, state) => kIsWeb
+            ? const DesktopMobileWrapper(child: WebAdminLoginScreen())
+            : const AdminLoginScreen(),
       ),
       GoRoute(
         path: '/admin/dashboard',
@@ -139,6 +150,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/id-claims',
         builder: (context, state) => const IdClaimsScreen(),
+      ),
+      GoRoute(
+        path: '/admin/finances',
+        builder: (context, state) => const FinancialDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/admin/finances/obligations',
+        builder: (context, state) => const StudentObligationsListScreen(),
+      ),
+      GoRoute(
+        path: '/admin/finances/cashflow',
+        builder: (context, state) => const OrgCashflowLogsScreen(),
       ),
       GoRoute(
         path: '/admin/logs',

@@ -115,9 +115,9 @@ class _StudentIdScreenState extends ConsumerState<StudentIdScreen> {
         ),
         body: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
+              constraints: const BoxConstraints(maxWidth: 520),
               child: Column(children: [_buildIdCard(), _buildNoteWidget()]),
             ),
           ),
@@ -192,29 +192,34 @@ class _StudentIdScreenState extends ConsumerState<StudentIdScreen> {
               const SizedBox(height: 24),
               const Divider(color: TraceColors.lightGrey),
               const SizedBox(height: 24),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: TraceColors.lightGrey.withValues(alpha: 0.5),
-                    width: 1.5,
-                  ),
-                ),
-                child: QrImageView(
-                  data: _student!.qrHash,
-                  version: QrVersions.auto,
-                  size: 288,
-                  eyeStyle: const QrEyeStyle(
-                    eyeShape: QrEyeShape.square,
-                    color: TraceColors.navyBlue,
-                  ),
-                  dataModuleStyle: const QrDataModuleStyle(
-                    dataModuleShape: QrDataModuleShape.circle,
-                    color: TraceColors.navyBlue,
-                  ),
-                ),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final qrSize = (constraints.maxWidth - 48).clamp(160.0, 288.0);
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: TraceColors.lightGrey.withValues(alpha: 0.5),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: QrImageView(
+                      data: _student!.qrHash,
+                      version: QrVersions.auto,
+                      size: qrSize,
+                      eyeStyle: const QrEyeStyle(
+                        eyeShape: QrEyeShape.square,
+                        color: TraceColors.navyBlue,
+                      ),
+                      dataModuleStyle: const QrDataModuleStyle(
+                        dataModuleShape: QrDataModuleShape.circle,
+                        color: TraceColors.navyBlue,
+                      ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 16),
               Container(
@@ -296,8 +301,9 @@ class _StudentIdScreenState extends ConsumerState<StudentIdScreen> {
   }
 
   Widget _buildAvatarWidget(String url) {
-    if (url.isEmpty)
+    if (url.isEmpty) {
       return const Icon(Icons.person, size: 54, color: TraceColors.lightGrey);
+    }
     if (url.startsWith('data:image')) {
       try {
         return Image.memory(
@@ -377,11 +383,12 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       val.trim(),
       excludeDocId: widget.student.id,
     );
-    if (mounted)
+    if (mounted) {
       setState(() {
         _isCheckingId = false;
         _idError = taken ? 'ID already used' : null;
       });
+    }
   }
 
   Future<void> _save() async {
@@ -455,11 +462,13 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   }
 
   Widget _avatarPreview() {
-    if (_pickedBytes != null)
+    if (_pickedBytes != null) {
       return Image.memory(_pickedBytes!, fit: BoxFit.cover);
+    }
     final url = widget.student.avatarUrl;
-    if (url.isEmpty)
+    if (url.isEmpty) {
       return const Icon(Icons.person, size: 40, color: TraceColors.lightGrey);
+    }
     if (url.startsWith('data:image')) {
       try {
         return Image.memory(

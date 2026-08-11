@@ -85,8 +85,9 @@ class AttendanceService {
         final matches = offlineStudents
             .where((s) => s.qrHash == qrHash)
             .toList();
-        if (matches.isEmpty)
+        if (matches.isEmpty) {
           return ScanResult(status: ScanResultStatus.studentNotFound);
+        }
         student = matches.first;
 
         if (offlineAttendance != null) {
@@ -228,8 +229,9 @@ class AttendanceService {
       };
 
       if (isOfflineMode) {
-        if (offlineAttendance != null)
+        if (offlineAttendance != null) {
           offlineAttendance[attendanceDocId!] = updatedData;
+        }
         FirestoreService.attendance
             .doc(attendanceDocId)
             .update(updateFields); // Fire and forget
@@ -326,8 +328,9 @@ class AttendanceService {
 
   static String _computeStatus(ScanPhase phase, DateTime now, Event event) {
     if (event.timeInClosed ||
-        (event.cutOffTime != null && now.isAfter(event.cutOffTime!)))
+        (event.cutOffTime != null && now.isAfter(event.cutOffTime!))) {
       return 'Late';
+    }
     return 'Incomplete';
   }
 

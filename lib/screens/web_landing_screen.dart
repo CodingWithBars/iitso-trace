@@ -15,14 +15,23 @@ import '../widgets/web_landing/footer_section.dart';
 // Only shown when kIsWeb == true (enforced via routes.dart redirect)
 // ─────────────────────────────────────────────────────────────────────────────
 
-class WebLandingScreen extends StatefulWidget {
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../services/student_session_service.dart';
+import '../services/auth_service.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Web-Only Marketing / Public Landing Page
+// Only shown when kIsWeb == true (enforced via routes.dart redirect)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class WebLandingScreen extends ConsumerStatefulWidget {
   const WebLandingScreen({super.key});
 
   @override
-  State<WebLandingScreen> createState() => _WebLandingScreenState();
+  ConsumerState<WebLandingScreen> createState() => _WebLandingScreenState();
 }
 
-class _WebLandingScreenState extends State<WebLandingScreen> {
+class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -50,26 +59,96 @@ class _WebLandingScreenState extends State<WebLandingScreen> {
   // ─── NAVBAR ────────────────────────────────────────────────────────────────
 
   Widget _buildNavbar(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width > 700;
+    final width = MediaQuery.of(context).size.width;
+    final isWide = width > 700;
+    final isSmallMobile = width < 420;
+
+    final sessionAsync = ref.watch(studentSessionProvider);
+    final studentId = sessionAsync.valueOrNull;
+    final isLoggedInStudent = studentId != null && studentId.isNotEmpty;
+    final isAdmin = ref.watch(authServiceProvider).isLoggedIn;
+
     return Container(
       color: TraceColors.navyBlue,
-      padding: EdgeInsets.symmetric(horizontal: isWide ? 80 : 24, vertical: 16),
+      padding: EdgeInsets.symmetric(
+        horizontal: isWide ? 80 : (isSmallMobile ? 12 : 20),
+        vertical: 14,
+      ),
       child: Row(
         children: [
-          ShaderMask(
-            shaderCallback: (b) => TraceColors.goldGradient.createShader(b),
-            child: Text(
-              'trace',
-              style: GoogleFonts.inter(
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-                letterSpacing: 1.5,
+          InkWell(
+            onTap: () => context.go('/'),
+            child: ShaderMask(
+              shaderCallback: (b) => TraceColors.goldGradient.createShader(b),
+              child: Text(
+                'trace',
+                style: GoogleFonts.inter(
+                  fontSize: isSmallMobile ? 20 : 24,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: 1.5,
+                ),
               ),
             ),
           ),
           const Spacer(),
-          _registerButton(context, small: !isWide),
+          if (isAdmin) ...[
+            TextButton.icon(
+              onPressed: () => context.push('/admin/dashboard'),
+              icon: const Icon(
+                Icons.admin_panel_settings_outlined,
+                color: TraceColors.gold,
+                size: 18,
+              ),
+              label: Text(
+                isSmallMobile ? 'Admin' : 'Admin Portal',
+                style: GoogleFonts.inter(
+                  color: TraceColors.gold,
+                  fontWeight: FontWeight.w700,
+                  fontSize: isSmallMobile ? 11 : 13,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          if (isLoggedInStudent) ...[
+            TextButton.icon(
+              onPressed: () => context.push('/student/id/$studentId'),
+              icon: const Icon(
+                Icons.badge_outlined,
+                color: TraceColors.gold,
+                size: 18,
+              ),
+              label: Text(
+                'My ID',
+                style: GoogleFonts.inter(
+                  color: const Color(0xFFFFD700),
+                  fontWeight: FontWeight.w800,
+                  fontSize: isSmallMobile ? 12 : 13,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ] else ...[
+            TextButton.icon(
+              onPressed: () => context.go('/student-login'),
+              icon: const Icon(
+                Icons.login_rounded,
+                color: Colors.white,
+                size: 16,
+              ),
+              label: Text(
+                'Login',
+                style: GoogleFonts.inter(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: isSmallMobile ? 12 : 13,
+                ),
+              ),
+            ),
+            SizedBox(width: isSmallMobile ? 4 : 10),
+          ],
+          _registerButton(context, small: !isWide || isSmallMobile),
         ],
       ),
     );
@@ -83,8 +162,8 @@ class _WebLandingScreenState extends State<WebLandingScreen> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           padding: EdgeInsets.symmetric(
-            horizontal: small ? 12 : 18,
-            vertical: small ? 8 : 10,
+            horizontal: small ? 10 : 16,
+            vertical: small ? 7 : 9,
           ),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
@@ -94,8 +173,8 @@ class _WebLandingScreenState extends State<WebLandingScreen> {
             boxShadow: [
               BoxShadow(
                 color: TraceColors.gold.withValues(alpha: 0.35),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
               ),
             ],
           ),
@@ -104,16 +183,16 @@ class _WebLandingScreenState extends State<WebLandingScreen> {
             children: [
               const Icon(
                 Icons.person_add_rounded,
-                size: 16,
+                size: 15,
                 color: Color(0xFF0D1B3E),
               ),
-              SizedBox(width: small ? 4 : 6),
+              SizedBox(width: small ? 3 : 6),
               Text(
                 'Register',
                 style: GoogleFonts.inter(
                   color: const Color(0xFF0D1B3E),
                   fontWeight: FontWeight.w800,
-                  fontSize: small ? 12 : 13,
+                  fontSize: small ? 11 : 13,
                 ),
               ),
             ],

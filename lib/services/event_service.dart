@@ -6,8 +6,9 @@ import 'notification_service.dart';
 class EventService {
   static Future<void> createEvent(Map<String, dynamic> data) async {
     final payload = Map<String, dynamic>.from(data);
-    if (!payload.containsKey('date'))
+    if (!payload.containsKey('date')) {
       payload['date'] = FieldValue.serverTimestamp();
+    }
     final docRef = await FirebaseFirestore.instance
         .collection('events')
         .add(payload);

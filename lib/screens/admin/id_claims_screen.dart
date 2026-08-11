@@ -22,10 +22,11 @@ class IdClaimsScreen extends StatelessWidget {
             .orderBy('submitted_at', descending: true)
             .snapshots(),
         builder: (ctx, snap) {
-          if (!snap.hasData)
+          if (!snap.hasData) {
             return const Center(
               child: CircularProgressIndicator(color: TraceColors.navyBlue),
             );
+          }
           final docs = snap.data!.docs;
           if (docs.isEmpty) {
             return Center(

@@ -48,9 +48,9 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 1500), () {
+    Future.delayed(const Duration(milliseconds: 300), () {
       if (mounted) setState(() => _isSplashVisible = false);
-      Future.delayed(const Duration(milliseconds: 500), () {
+      Future.delayed(const Duration(milliseconds: 200), () {
         if (mounted) setState(() => _isSplashRendered = false);
       });
     });
@@ -305,14 +305,14 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
   Widget _buildForm(bool isWide) {
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 680),
+          constraints: const BoxConstraints(maxWidth: 520),
           child: Column(
             children: [
               // Form card
               TraceCard(
-                padding: const EdgeInsets.all(28),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                 child: Form(
                   key: _formKey,
                   child: Column(

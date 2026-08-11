@@ -380,8 +380,9 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
           .orderBy('submitted_at', descending: true)
           .snapshots(),
       builder: (ctx, snap) {
-        if (!snap.hasData)
+        if (!snap.hasData) {
           return const Center(child: CircularProgressIndicator());
+        }
         final docs = snap.data!.docs;
         final pending = docs
             .where(
@@ -1238,6 +1239,63 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
               return Column(
                 children: [
                   _buildSwipeableFinanceStats(income, expense, docs),
+                  const SizedBox(height: 12),
+                  InkWell(
+                    onTap: () => context.push('/admin/finances'),
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [TraceColors.navyBlue, TraceColors.royalBlue],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: TraceColors.navyBlue.withValues(alpha: 0.2),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Financials & Dues Portal',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Manage obligations, sanctions & cashflow logs',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    color: Colors.white.withValues(alpha: 0.8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            color: TraceColors.gold,
+                            size: 16,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   TextField(
                     decoration: InputDecoration(
@@ -1625,27 +1683,32 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                               var docs = snap.docs.where((d) {
                                 final data = d.data();
                                 if (typeFilter == 'Expenses' &&
-                                    data['type'] != 'expense')
+                                    data['type'] != 'expense') {
                                   return false;
+                                }
                                 if (typeFilter == 'Contributions' &&
                                     data['type'] != 'income' &&
-                                    data['type'] != 'contribution')
+                                    data['type'] != 'contribution') {
                                   return false;
+                                }
                                 if (data['date'] != null) {
                                   final dt = (data['date'] as Timestamp)
                                       .toDate();
                                   if (fromDate != null &&
-                                      dt.isBefore(fromDate!))
+                                      dt.isBefore(fromDate!)) {
                                     return false;
+                                  }
                                   if (toDate != null &&
                                       dt.isAfter(
                                         toDate!.add(const Duration(days: 1)),
-                                      ))
+                                      )) {
                                     return false;
+                                  }
                                 }
                                 if (selectedEvent != null &&
-                                    data['event_id'] != selectedEvent)
+                                    data['event_id'] != selectedEvent) {
                                   return false;
+                                }
                                 return true;
                               }).toList();
 
@@ -1674,27 +1737,32 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                               var docs = snap.docs.where((d) {
                                 final data = d.data();
                                 if (typeFilter == 'Expenses' &&
-                                    data['type'] != 'expense')
+                                    data['type'] != 'expense') {
                                   return false;
+                                }
                                 if (typeFilter == 'Contributions' &&
                                     data['type'] != 'income' &&
-                                    data['type'] != 'contribution')
+                                    data['type'] != 'contribution') {
                                   return false;
+                                }
                                 if (data['date'] != null) {
                                   final dt = (data['date'] as Timestamp)
                                       .toDate();
                                   if (fromDate != null &&
-                                      dt.isBefore(fromDate!))
+                                      dt.isBefore(fromDate!)) {
                                     return false;
+                                  }
                                   if (toDate != null &&
                                       dt.isAfter(
                                         toDate!.add(const Duration(days: 1)),
-                                      ))
+                                      )) {
                                     return false;
+                                  }
                                 }
                                 if (selectedEvent != null &&
-                                    data['event_id'] != selectedEvent)
+                                    data['event_id'] != selectedEvent) {
                                   return false;
+                                }
                                 return true;
                               }).toList();
 

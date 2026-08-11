@@ -26,6 +26,9 @@ service cloud.firestore {
     match /funds/{fundId} { allow read: if true; }
     match /announcements/{annId} { allow read: if true; }
     match /attendance/{attId} { allow read: if true; }
+    match /student_obligations/{obId} { allow read: if true; allow write: if isAdmin(); }
+    match /org_transactions/{txId} { allow read: if true; allow write: if isAdmin(); }
+    match /payment_records/{recId} { allow read: if true; allow write: if isAdmin(); }
     
     // Students can register (create) and read profiles
     match /students/{studentId} {
