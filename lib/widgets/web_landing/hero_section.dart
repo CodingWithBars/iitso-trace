@@ -7,7 +7,8 @@ import '../../theme/app_theme.dart';
 class HeroSection extends StatelessWidget {
   const HeroSection({super.key});
 
-  static const String _apkUrl = 'https://tinyurl.com/46k9z2p5';
+  static const String _apkUrl =
+      'https://github.com/CodingWithBars/iitso-trace/releases/download/IITSO-TRACE/trace.apk';
 
   void _launchApkDownload() async {
     final uri = Uri.parse(_apkUrl);
