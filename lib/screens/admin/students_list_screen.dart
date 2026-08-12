@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
+import '../../services/student_service.dart';
 
 class StudentsListScreen extends StatefulWidget {
   const StudentsListScreen({super.key});
@@ -16,6 +17,7 @@ class StudentsListScreen extends StatefulWidget {
 class _StudentsListScreenState extends State<StudentsListScreen> {
   String _selectedYear = 'All';
   bool _sortAscending = true;
+  String _searchQuery = '';
   final List<String> _years = [
     'All',
     '1st Year',
@@ -38,6 +40,13 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
           ),
           onPressed: () => context.pop(),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.restore_page_rounded, color: TraceColors.white),
+            tooltip: 'Restore Archived Records',
+            onPressed: () => _showRestoreRecordsDialog(),
+          ),
+        ],
         title: Text(
           'List of Students',
           style: GoogleFonts.inter(
@@ -103,7 +112,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                   }
 
                   final allDocs = snap.data?.docs ?? [];
-                  final filteredDocs = _selectedYear == 'All'
+                  var filteredDocs = _selectedYear == 'All'
                       ? allDocs
                       : allDocs.where((doc) {
                           final yearLevel =
@@ -112,6 +121,17 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                               '';
                           return yearLevel == _selectedYear;
                         }).toList();
+
+                  if (_searchQuery.isNotEmpty) {
+                    final q = _searchQuery.toLowerCase();
+                    filteredDocs = filteredDocs.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final name = (data['name'] ?? '').toString().toLowerCase();
+                      final id = (data['student_id'] ?? '').toString().toLowerCase();
+                      final course = (data['course'] ?? '').toString().toLowerCase();
+                      return name.contains(q) || id.contains(q) || course.contains(q);
+                    }).toList();
+                  }
 
                   filteredDocs.sort((a, b) {
                     final nameA =
@@ -129,6 +149,27 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
 
                   return Column(
                     children: [
+                      // Search Bar
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                        child: TextField(
+                          decoration: InputDecoration(
+                            hintText: 'Search by name, ID, or course...',
+                            prefixIcon: const Icon(Icons.search_rounded),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 0,
+                              horizontal: 16,
+                            ),
+                            fillColor: Colors.white,
+                            filled: true,
+                          ),
+                          onChanged: (val) => setState(() => _searchQuery = val),
+                        ),
+                      ),
                       Padding(
                         padding: const EdgeInsets.all(16),
                         child: Row(
@@ -206,7 +247,6 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
 
                                   return Container(
                                     margin: const EdgeInsets.only(bottom: 12),
-                                    padding: const EdgeInsets.all(16),
                                     decoration: BoxDecoration(
                                       color: TraceColors.white,
                                       borderRadius: BorderRadius.circular(16),
@@ -219,8 +259,19 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                                         ),
                                       ],
                                     ),
-                                    child: Row(
-                                      children: [
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(16),
+                                        onTap: () {
+                                          if (studentId.isNotEmpty) {
+                                            context.push('/admin/students/$studentId');
+                                          }
+                                        },
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(16),
+                                          child: Row(
+                                            children: [
                                         CircleAvatar(
                                           radius: 24,
                                           backgroundColor: TraceColors.royalBlue
@@ -261,12 +312,15 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                                                   color: TraceColors.medGrey,
                                                 ),
                                               ),
-                                            ],
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
-                                  );
+                                  ),
+                                ),
+                              );
                                 },
                               ),
                       ),
@@ -292,5 +346,107 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
       }
     }
     return NetworkImage(url);
+  }
+
+  void _showRestoreRecordsDialog() {
+    final emailCtrl = TextEditingController();
+    final idCtrl = TextEditingController();
+    bool isRestoring = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(
+            'Restore Archived Records',
+            style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Enter the incorrect email used by the student to retrieve their archived records and transfer them to their correct Student ID.',
+                style: GoogleFonts.inter(fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'Wrong/Archived Email',
+                  hintText: 'e.g. wrong@gmail.com',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: idCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Correct Student ID',
+                  hintText: 'e.g. 2024-0001',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: TraceColors.gold),
+              onPressed: isRestoring
+                  ? null
+                  : () async {
+                      final wrongEmail = emailCtrl.text.trim();
+                      final correctId = idCtrl.text.trim();
+                      if (wrongEmail.isEmpty || correctId.isEmpty) return;
+
+                      setLocal(() => isRestoring = true);
+                      try {
+                        final restoredCount =
+                            await StudentService.restoreArchivedRecords(
+                          wrongEmail: wrongEmail,
+                          correctStudentId: correctId,
+                          adminName: 'Admin', // Placeholder for admin name
+                        );
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                restoredCount > 0
+                                    ? 'Successfully restored $restoredCount records.'
+                                    : 'No archived records found for $wrongEmail.',
+                              ),
+                              backgroundColor: restoredCount > 0
+                                  ? TraceColors.success
+                                  : TraceColors.error,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        setLocal(() => isRestoring = false);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error restoring records: $e'),
+                              backgroundColor: TraceColors.error,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: isRestoring
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text('Restore', style: GoogleFonts.inter(color: TraceColors.navyBlue, fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

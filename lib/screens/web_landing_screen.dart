@@ -24,6 +24,8 @@ import '../services/auth_service.dart';
 // Only shown when kIsWeb == true (enforced via routes.dart redirect)
 // ─────────────────────────────────────────────────────────────────────────────
 
+import '../widgets/pwa_install_banner.dart';
+
 class WebLandingScreen extends ConsumerStatefulWidget {
   const WebLandingScreen({super.key});
 
@@ -36,6 +38,7 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: TraceColors.offWhite,
+      bottomNavigationBar: const PwaInstallBanner(),
       body: SelectionArea(
         child: SingleChildScrollView(
           child: Column(
@@ -91,82 +94,95 @@ class _WebLandingScreenState extends ConsumerState<WebLandingScreen> {
               ),
             ),
           ),
-          const Spacer(),
-          if (isAdmin) ...[
-            TextButton.icon(
-              onPressed: () => context.push('/admin/dashboard'),
-              icon: const Icon(
-                Icons.admin_panel_settings_outlined,
-                color: TraceColors.gold,
-                size: 18,
-              ),
-              label: Text(
-                isSmallMobile ? 'Admin' : 'Admin Portal',
-                style: GoogleFonts.inter(
-                  color: TraceColors.gold,
-                  fontWeight: FontWeight.w700,
-                  fontSize: isSmallMobile ? 11 : 13,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isAdmin) ...[
+                      TextButton.icon(
+                        onPressed: () => context.push('/admin/dashboard'),
+                        icon: const Icon(
+                          Icons.admin_panel_settings_outlined,
+                          color: TraceColors.gold,
+                          size: 18,
+                        ),
+                        label: Text(
+                          isSmallMobile ? 'Admin' : 'Admin Portal',
+                          style: GoogleFonts.inter(
+                            color: TraceColors.gold,
+                            fontWeight: FontWeight.w700,
+                            fontSize: isSmallMobile ? 11 : 13,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    if (isLoggedInStudent) ...[
+                      TextButton.icon(
+                        onPressed: () => context.push('/student/summary/$studentId'),
+                        icon: const Icon(
+                          Icons.space_dashboard_rounded,
+                          color: TraceColors.gold,
+                          size: 18,
+                        ),
+                        label: Text(
+                          isSmallMobile ? 'Portal' : 'Student Portal',
+                          style: GoogleFonts.inter(
+                            color: const Color(0xFFFFD700),
+                            fontWeight: FontWeight.w700,
+                            fontSize: isSmallMobile ? 12 : 13,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton.icon(
+                        onPressed: () => context.push('/student/id/$studentId'),
+                        icon: const Icon(
+                          Icons.badge_outlined,
+                          color: TraceColors.gold,
+                          size: 18,
+                        ),
+                        label: Text(
+                          'My ID',
+                          style: GoogleFonts.inter(
+                            color: const Color(0xFFFFD700),
+                            fontWeight: FontWeight.w800,
+                            fontSize: isSmallMobile ? 12 : 13,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    if (!isLoggedInStudent && !isAdmin) ...[
+                      TextButton.icon(
+                        onPressed: () => context.go('/student-login'),
+                        icon: const Icon(
+                          Icons.login_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                        label: Text(
+                          'Login',
+                          style: GoogleFonts.inter(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: isSmallMobile ? 12 : 13,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: isSmallMobile ? 4 : 10),
+                      _registerButton(context, small: !isWide || isSmallMobile),
+                    ],
+                  ],
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-          ],
-          if (isLoggedInStudent) ...[
-            TextButton.icon(
-              onPressed: () => context.push('/student/summary/$studentId'),
-              icon: const Icon(
-                Icons.space_dashboard_rounded,
-                color: TraceColors.gold,
-                size: 18,
-              ),
-              label: Text(
-                'Student Portal',
-                style: GoogleFonts.inter(
-                  color: const Color(0xFFFFD700),
-                  fontWeight: FontWeight.w700,
-                  fontSize: isSmallMobile ? 12 : 13,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            TextButton.icon(
-              onPressed: () => context.push('/student/id/$studentId'),
-              icon: const Icon(
-                Icons.badge_outlined,
-                color: TraceColors.gold,
-                size: 18,
-              ),
-              label: Text(
-                'My ID',
-                style: GoogleFonts.inter(
-                  color: const Color(0xFFFFD700),
-                  fontWeight: FontWeight.w800,
-                  fontSize: isSmallMobile ? 12 : 13,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-          ] else ...[
-            TextButton.icon(
-              onPressed: () => context.go('/student-login'),
-              icon: const Icon(
-                Icons.login_rounded,
-                color: Colors.white,
-                size: 16,
-              ),
-              label: Text(
-                'Login',
-                style: GoogleFonts.inter(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: isSmallMobile ? 12 : 13,
-                ),
-              ),
-            ),
-            SizedBox(width: isSmallMobile ? 4 : 10),
-          ],
-          if (!isLoggedInStudent && !isAdmin)
-            _registerButton(context, small: !isWide || isSmallMobile),
+          ),
         ],
       ),
     );

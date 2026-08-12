@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+
 import '../../theme/app_theme.dart';
 import '../../models/obligation.dart';
 import '../../models/event.dart';
@@ -12,7 +15,6 @@ import '../../services/auth_service.dart';
 import 'payment_scanner_modal.dart';
 import 'student_obligations_list_screen.dart';
 import 'org_cashflow_logs_screen.dart';
-
 import 'record_manual_payment_screen.dart';
 
 class FinancialDashboardScreen extends ConsumerStatefulWidget {
@@ -548,70 +550,151 @@ class _FinancialDashboardScreenState
     final titleCtrl = TextEditingController();
     final amountCtrl = TextEditingController();
     String category = 'equipment';
+    XFile? receiptImage;
+    bool isUploading = false;
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) {
-        return AlertDialog(
-          title: Text('Log Org Expense', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleCtrl,
-                decoration: const InputDecoration(labelText: 'Expense Description', hintText: 'e.g. Sound System Rental'),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('Log Org Expense', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: titleCtrl,
+                      decoration: const InputDecoration(labelText: 'Expense Description', hintText: 'e.g. Sound System Rental'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: amountCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Amount (₱)'),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: category,
+                      decoration: const InputDecoration(labelText: 'Category'),
+                      items: const [
+                        DropdownMenuItem(value: 'equipment', child: Text('Equipment / Venue')),
+                        DropdownMenuItem(value: 'food', child: Text('Food & Refreshments')),
+                        DropdownMenuItem(value: 'prizes', child: Text('Prizes & Certificates')),
+                        DropdownMenuItem(value: 'other', child: Text('Other Expense')),
+                      ],
+                      onChanged: (val) => category = val ?? 'other',
+                    ),
+                    const SizedBox(height: 16),
+                    // Receipt Upload UI
+                    InkWell(
+                      onTap: isUploading ? null : () async {
+                        final picker = ImagePicker();
+                        final img = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+                        if (img != null) {
+                          setState(() => receiptImage = img);
+                        }
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: TraceColors.offWhite,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: TraceColors.lightGrey),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(
+                              receiptImage != null ? Icons.image_rounded : Icons.add_a_photo_rounded,
+                              color: receiptImage != null ? TraceColors.navyBlue : TraceColors.medGrey,
+                              size: 32,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              receiptImage != null ? 'Receipt Attached: ${receiptImage!.name}' : 'Attach Receipt Photo (Optional)',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: receiptImage != null ? TraceColors.navyBlue : TraceColors.medGrey,
+                                fontWeight: receiptImage != null ? FontWeight.w600 : FontWeight.w400,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (isUploading) ...[
+                      const SizedBox(height: 16),
+                      const CircularProgressIndicator(color: TraceColors.navyBlue),
+                      const SizedBox(height: 8),
+                      Text('Uploading Receipt...', style: GoogleFonts.inter(fontSize: 12, color: TraceColors.medGrey)),
+                    ],
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: amountCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Amount (₱)'),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: category,
-                decoration: const InputDecoration(labelText: 'Category'),
-                items: const [
-                  DropdownMenuItem(value: 'equipment', child: Text('Equipment / Venue')),
-                  DropdownMenuItem(value: 'food', child: Text('Food & Refreshments')),
-                  DropdownMenuItem(value: 'prizes', child: Text('Prizes & Certificates')),
-                  DropdownMenuItem(value: 'other', child: Text('Other Expense')),
-                ],
-                onChanged: (val) => category = val ?? 'other',
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: TraceColors.royalBlue),
-              onPressed: () async {
-                final amt = double.tryParse(amountCtrl.text) ?? 0.0;
-                if (titleCtrl.text.isEmpty || amt <= 0) return;
+              actions: [
+                TextButton(
+                  onPressed: isUploading ? null : () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: TraceColors.royalBlue),
+                  onPressed: isUploading ? null : () async {
+                    final amt = double.tryParse(amountCtrl.text) ?? 0.0;
+                    if (titleCtrl.text.isEmpty || amt <= 0) return;
 
-                final user = ref.read(authServiceProvider).currentUser;
-                final tx = OrgTransaction(
-                  id: '',
-                  title: titleCtrl.text.trim(),
-                  type: 'expense',
-                  category: category,
-                  amount: amt,
-                  date: DateTime.now(),
-                  recordedBy: user?.email ?? 'Treasurer',
-                );
+                    setState(() => isUploading = true);
 
-                await FinancialService.addOrgTransaction(tx);
-                if (!ctx.mounted) return;
-                Navigator.pop(ctx);
-                _loadData();
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Expense logged to Treasury!'), backgroundColor: TraceColors.success),
-                );
-              },
-              child: const Text('Save Expense', style: TextStyle(color: Colors.white)),
-            ),
-          ],
+                    String? downloadUrl;
+                    try {
+                      if (receiptImage != null) {
+                        final bytes = await receiptImage!.readAsBytes();
+                        final ext = receiptImage!.name.split('.').last.toLowerCase();
+                        final safeExt = (ext == 'png' || ext == 'jpg' || ext == 'jpeg') ? ext : 'jpg';
+                        final ref = FirebaseStorage.instance
+                            .ref()
+                            .child('receipts/${DateTime.now().millisecondsSinceEpoch}.$safeExt');
+                        
+                        final metadata = SettableMetadata(contentType: 'image/$safeExt');
+                        await ref.putData(bytes, metadata);
+                        downloadUrl = await ref.getDownloadURL();
+                      }
+                    } catch (e) {
+                      debugPrint('Error uploading receipt: $e');
+                      // If upload fails, we still want to log the expense, or you could show an error.
+                      // We'll proceed without the photo.
+                    }
+
+                    final user = ref.read(authServiceProvider).currentUser;
+                    final tx = OrgTransaction(
+                      id: '',
+                      title: titleCtrl.text.trim(),
+                      type: 'expense',
+                      category: category,
+                      amount: amt,
+                      date: DateTime.now(),
+                      receiptUrl: downloadUrl,
+                      recordedBy: user?.email ?? 'Treasurer',
+                    );
+
+                    await FinancialService.addOrgTransaction(tx);
+                    
+                    if (!ctx.mounted) return;
+                    Navigator.pop(ctx);
+                    _loadData();
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Expense logged to Treasury!'), backgroundColor: TraceColors.success),
+                    );
+                  },
+                  child: const Text('Save Expense', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          },
         );
       },
     );

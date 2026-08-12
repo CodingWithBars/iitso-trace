@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,16 +21,19 @@ class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen> {
   final _idController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _pinController = TextEditingController();
 
   bool _isLoading = false;
   bool _isAdmin = false;
   bool _obscurePassword = true;
+  bool _obscurePin = true;
 
   @override
   void dispose() {
     _idController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _pinController.dispose();
     super.dispose();
   }
 
@@ -53,28 +57,41 @@ class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen> {
           context.go('/admin/dashboard');
         }
       } else {
-        final student = await StudentService.studentLogin(
+        final result = await StudentService.studentLogin(
           _idController.text.trim(),
           _emailController.text.trim(),
+          _pinController.text.trim(),
         );
 
-        if (student != null) {
-          if (mounted) {
+        if (!mounted) return;
+
+        switch (result.status) {
+          case LoginStatus.success:
             await ref
                 .read(studentSessionProvider.notifier)
-                .login(student.studentId);
+                .login(result.student!.studentId);
             if (!mounted) return;
-            context.push('/student/id/${student.studentId}');
-          }
-        } else {
-          if (mounted) {
+            context.push('/student/id/${result.student!.studentId}');
+
+          case LoginStatus.needsPinSetup:
+            if (!mounted) return;
+            _showPinSetupDialog(result.student!.id, result.student!.studentId);
+
+          case LoginStatus.wrongPin:
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Invalid Student ID or Email'),
+                content: Text('Incorrect PIN. Please try again.'),
                 backgroundColor: TraceColors.error,
               ),
             );
-          }
+
+          case LoginStatus.notFound:
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Invalid Student ID or Email.'),
+                backgroundColor: TraceColors.error,
+              ),
+            );
         }
       }
     } catch (e) {
@@ -89,6 +106,105 @@ class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  /// Shown to legacy accounts (no PIN set) after login — forces them
+  /// to set a PIN before they can proceed.
+  void _showPinSetupDialog(String docId, String studentId) {
+    final pinCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    bool obscurePin = true;
+    bool obscureConfirm = true;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        String? error;
+        return StatefulBuilder(
+          builder: (ctx, setLocal) => AlertDialog(
+            title: Text(
+              'Set Your PIN',
+              style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'For your security, please set a 4–6 digit PIN. You will need this PIN to log in from now on.',
+                  style: GoogleFonts.inter(fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: pinCtrl,
+                  keyboardType: TextInputType.number,
+                  obscureText: obscurePin,
+                  maxLength: 6,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    labelText: 'New PIN (4–6 digits)',
+                    counterText: '',
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscurePin ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        color: TraceColors.medGrey,
+                      ),
+                      onPressed: () => setLocal(() => obscurePin = !obscurePin),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmCtrl,
+                  keyboardType: TextInputType.number,
+                  obscureText: obscureConfirm,
+                  maxLength: 6,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    labelText: 'Confirm PIN',
+                    counterText: '',
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscureConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        color: TraceColors.medGrey,
+                      ),
+                      onPressed: () => setLocal(() => obscureConfirm = !obscureConfirm),
+                    ),
+                  ),
+                ),
+                if (error != null) ...[const SizedBox(height: 8), Text(error!, style: const TextStyle(color: Colors.red, fontSize: 12))],
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: TraceColors.navyBlue),
+                onPressed: () async {
+                  final pin = pinCtrl.text.trim();
+                  final confirm = confirmCtrl.text.trim();
+                  if (pin.length < 4) {
+                    setLocal(() => error = 'PIN must be at least 4 digits.');
+                    return;
+                  }
+                  if (pin != confirm) {
+                    setLocal(() => error = 'PINs do not match.');
+                    return;
+                  }
+                  await StudentService.setStudentPin(docId, pin);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('PIN set successfully! Logging in...'), backgroundColor: TraceColors.success),
+                    );
+                    await ref.read(studentSessionProvider.notifier).login(studentId);
+                    if (mounted) context.push('/student/id/$studentId');
+                  }
+                },
+                child: Text('Save PIN', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -255,6 +371,38 @@ class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen> {
                           if (!v.contains('@')) return 'Enter a valid email';
                           return null;
                         },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _pinController,
+                        obscureText: _obscurePin,
+                        keyboardType: TextInputType.number,
+                        maxLength: 6,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        decoration: InputDecoration(
+                          labelText: 'PIN (Leave blank if old account)',
+                          hintText: '4–6 digit PIN',
+                          prefixIcon: const Icon(Icons.pin_outlined),
+                          counterText: '',
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePin
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              color: TraceColors.medGrey,
+                            ),
+                            onPressed: () => setState(
+                              () => _obscurePin = !_obscurePin,
+                            ),
+                          ),
+                        ),
+                        validator: (v) {
+                          if (v != null && v.isNotEmpty && v.length < 4) {
+                            return 'PIN must be at least 4 digits';
+                          }
+                          return null;
+                        },
+                        onFieldSubmitted: (_) => _login(),
                       ),
                     ] else ...[
                       TextFormField(

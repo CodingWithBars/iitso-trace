@@ -222,55 +222,62 @@ class FinancialService {
   // Organization Financial Transparency Ledger
   // ---------------------------------------------------------------------------
 
-  /// Fetch all organization income & expense transactions with smart deduplication
+  /// Fetch all organization income & expense transactions
   static Future<List<OrgTransaction>> getOrgTransactions() async {
     try {
-      final allDocs = <String, DocumentSnapshot<Map<String, dynamic>>>{};
-
-      // 1. Fetch from 'funds' collection (Primary Treasury Ledger)
       final snapFunds = await _db.collection('funds').get();
-      for (final doc in snapFunds.docs) {
-        allDocs[doc.id] = doc;
-      }
-
-      // 2. Fetch from legacy 'org_transactions' collection only if not present in funds
-      final snapOrg = await _db.collection('org_transactions').get();
-      for (final doc in snapOrg.docs) {
-        if (!allDocs.containsKey(doc.id)) {
-          allDocs[doc.id] = doc;
-        }
-      }
-
+      
       final list = <OrgTransaction>[];
-      for (final doc in allDocs.values) {
+      for (final doc in snapFunds.docs) {
         final data = doc.data();
-        if (data != null) {
-          try {
-            list.add(OrgTransaction.fromMap(data, doc.id));
-          } catch (err) {
-            debugPrint('[FinancialService] Error parsing doc ${doc.id}: $err');
+        try {
+          // Keep backward compatibility: parse title from description if title is missing
+          if (!data.containsKey('title') && data.containsKey('description')) {
+            data['title'] = data['description'];
           }
+          list.add(OrgTransaction.fromMap(data, doc.id));
+        } catch (err) {
+          debugPrint('[FinancialService] Error parsing doc ${doc.id}: $err');
         }
       }
 
-      // 3. Smart Deduplication: collapse records with identical title, amount, type & minute
-      final uniqueList = <OrgTransaction>[];
-      final seenKeys = <String>{};
-
-      for (final tx in list) {
-        final key = '${tx.title.trim().toLowerCase()}_${tx.amount}_${tx.type}_${tx.date.year}_${tx.date.month}_${tx.date.day}_${tx.date.hour}_${tx.date.minute}';
-        if (!seenKeys.contains(key)) {
-          seenKeys.add(key);
-          uniqueList.add(tx);
-        }
-      }
-
-      uniqueList.sort((a, b) => b.date.compareTo(a.date));
-      return uniqueList;
+      list.sort((a, b) => b.date.compareTo(a.date));
+      return list;
     } catch (e) {
       debugPrint('[FinancialService] Error fetching org transactions: $e');
       return [];
     }
+  }
+
+  /// One-time script to migrate legacy 'org_transactions' into 'funds'
+  static Future<int> migrateLegacyOrgTransactionsToFunds() async {
+    final legacySnap = await _db.collection('org_transactions').get();
+    if (legacySnap.docs.isEmpty) return 0;
+    
+    final batch = _db.batch();
+    int count = 0;
+    
+    for (final doc in legacySnap.docs) {
+      final data = doc.data();
+      final newRef = _db.collection('funds').doc();
+      
+      // Ensure description exists for funds collection mapping
+      if (data.containsKey('title') && !data.containsKey('description')) {
+        data['description'] = data['title'];
+      }
+      
+      batch.set(newRef, data);
+      count++;
+    }
+    
+    if (count > 0) {
+      await batch.commit();
+      
+      // Delete legacy collection records after migrating? 
+      // Usually, we'd do a secondary batch to delete, but for safety we might just leave them 
+      // or the user can manually delete them from Firebase Console.
+    }
+    return count;
   }
 
   /// Add a financial transaction (income or expense) to the org ledger funds collection

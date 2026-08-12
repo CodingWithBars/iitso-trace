@@ -27,8 +27,10 @@ class _LandingScreenState extends ConsumerState<LandingScreen> {
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width > 800;
-    final authService = ref.watch(authServiceProvider);
-    final isAdmin = authService.isLoggedIn;
+
+    // Watch the reactive auth stream — rebuilds instantly when signOut() fires
+    final authUser = ref.watch(authStateProvider).valueOrNull;
+    final isAdmin = authUser != null;
 
     return Scaffold(
       backgroundColor: TraceColors.offWhite,

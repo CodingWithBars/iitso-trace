@@ -4,8 +4,13 @@ import '../theme/app_theme.dart';
 
 class TermsBottomSheet extends StatefulWidget {
   final VoidCallback onScrolledToBottom;
+  final VoidCallback onAccepted;
 
-  const TermsBottomSheet({super.key, required this.onScrolledToBottom});
+  const TermsBottomSheet({
+    super.key,
+    required this.onScrolledToBottom,
+    required this.onAccepted,
+  });
 
   @override
   State<TermsBottomSheet> createState() => _TermsBottomSheetState();
@@ -126,18 +131,39 @@ class _TermsBottomSheetState extends State<TermsBottomSheet> {
                     ),
                     const SizedBox(height: 48),
                     Center(
-                      child: Text(
-                        _reachedBottom
-                            ? 'You may now close this and check the box.'
-                            : 'Please scroll to the bottom to continue.',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: _reachedBottom
-                              ? Colors.green
-                              : TraceColors.error,
-                        ),
-                      ),
+                      child: _reachedBottom
+                          ? SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                onPressed: () {
+                                  widget.onAccepted();
+                                  Navigator.pop(context);
+                                },
+                                child: Text(
+                                  'Accept',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Text(
+                              'Please scroll to the bottom to continue.',
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: TraceColors.error,
+                              ),
+                            ),
                     ),
                     const SizedBox(
                       height: 48,

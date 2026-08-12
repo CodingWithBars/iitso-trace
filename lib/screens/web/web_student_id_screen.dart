@@ -334,25 +334,20 @@ class _EditProfileSheet extends StatefulWidget {
 
 class _EditProfileSheetState extends State<_EditProfileSheet> {
   late TextEditingController _nameCtrl;
-  late TextEditingController _idCtrl;
   Uint8List? _pickedBytes;
   String? _pickedBase64;
   bool _isSaving = false;
-  bool _isCheckingId = false;
-  String? _idError;
   String? _generalError;
 
   @override
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.student.name);
-    _idCtrl = TextEditingController(text: widget.student.studentId);
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _idCtrl.dispose();
     super.dispose();
   }
 
@@ -370,59 +365,21 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     });
   }
 
-  Future<void> _onIdChanged(String val) async {
-    if (val.trim() == widget.student.studentId) {
-      setState(() => _idError = null);
-      return;
-    }
-    setState(() {
-      _isCheckingId = true;
-      _idError = null;
-    });
-    final taken = await StudentService.isStudentIdTaken(
-      val.trim(),
-      excludeDocId: widget.student.id,
-    );
-    if (mounted) {
-      setState(() {
-        _isCheckingId = false;
-        _idError = taken ? 'ID already used' : null;
-      });
-    }
-  }
-
   Future<void> _save() async {
     final name = _nameCtrl.text.trim();
-    final id = _idCtrl.text.trim();
-    if (name.isEmpty || id.isEmpty) {
-      setState(() => _generalError = 'Name and Student ID cannot be empty.');
+    if (name.isEmpty) {
+      setState(() => _generalError = 'Name cannot be empty.');
       return;
     }
-    if (_idError != null) return;
     setState(() {
       _isSaving = true;
       _generalError = null;
     });
     try {
-      if (id != widget.student.studentId) {
-        final taken = await StudentService.isStudentIdTaken(
-          id,
-          excludeDocId: widget.student.id,
-        );
-        if (taken) {
-          setState(() {
-            _idError = 'ID already used';
-            _isSaving = false;
-          });
-          return;
-        }
-      }
       String? newAvatarUrl;
       if (_pickedBytes != null) {
         try {
-          newAvatarUrl =
-              await StudentService.uploadAvatar(_pickedBytes!, id) ??
-              _pickedBase64;
+          newAvatarUrl = await StudentService.uploadAvatar(_pickedBytes!, widget.student.studentId) ?? _pickedBase64;
         } catch (_) {
           newAvatarUrl = _pickedBase64;
         }
@@ -430,12 +387,11 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       await StudentService.updateStudentProfile(
         docId: widget.student.id,
         name: name,
-        studentId: id,
         avatarUrl: newAvatarUrl,
       );
       final updated = Student(
         id: widget.student.id,
-        studentId: id,
+        studentId: widget.student.studentId,
         name: name,
         course: widget.student.course,
         yearLevel: widget.student.yearLevel,
@@ -447,10 +403,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
         Navigator.pop(context);
         widget.onSaved(updated);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile updated!'),
-            backgroundColor: TraceColors.success,
-          ),
+          const SnackBar(content: Text('Profile updated!'), backgroundColor: TraceColors.success),
         );
       }
     } catch (e) {
@@ -462,27 +415,15 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   }
 
   Widget _avatarPreview() {
-    if (_pickedBytes != null) {
-      return Image.memory(_pickedBytes!, fit: BoxFit.cover);
-    }
+    if (_pickedBytes != null) return Image.memory(_pickedBytes!, fit: BoxFit.cover);
     final url = widget.student.avatarUrl;
-    if (url.isEmpty) {
-      return const Icon(Icons.person, size: 40, color: TraceColors.lightGrey);
-    }
+    if (url.isEmpty) return const Icon(Icons.person, size: 40, color: TraceColors.lightGrey);
     if (url.startsWith('data:image')) {
       try {
-        return Image.memory(
-          base64Decode(url.split(',').last),
-          fit: BoxFit.cover,
-        );
+        return Image.memory(base64Decode(url.split(',').last), fit: BoxFit.cover);
       } catch (_) {}
     }
-    return Image.network(
-      url,
-      fit: BoxFit.cover,
-      errorBuilder: (_, _, _) =>
-          const Icon(Icons.person, size: 40, color: TraceColors.lightGrey),
-    );
+    return Image.network(url, fit: BoxFit.cover, errorBuilder: (_, _, _) => const Icon(Icons.person, size: 40, color: TraceColors.lightGrey));
   }
 
   @override
@@ -502,54 +443,28 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
             child: Container(
               width: 40,
               height: 4,
-              decoration: BoxDecoration(
-                color: TraceColors.lightGrey,
-                borderRadius: BorderRadius.circular(2),
-              ),
+              decoration: BoxDecoration(color: TraceColors.lightGrey, borderRadius: BorderRadius.circular(2)),
             ),
           ),
           const SizedBox(height: 20),
-          Text(
-            'Edit Profile',
-            style: GoogleFonts.inter(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: TraceColors.navyBlue,
-            ),
-          ),
+          Text('Edit Profile', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: TraceColors.navyBlue)),
           const SizedBox(height: 24),
-
-          // Avatar picker
           Center(
             child: GestureDetector(
               onTap: _pickImage,
               child: Stack(
                 children: [
                   Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: TraceColors.gold, width: 3),
-                      color: TraceColors.offWhite,
-                    ),
+                    width: 100, height: 100,
+                    decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: TraceColors.gold, width: 3), color: TraceColors.offWhite),
                     child: ClipOval(child: _avatarPreview()),
                   ),
                   Positioned(
-                    bottom: 0,
-                    right: 0,
+                    bottom: 0, right: 0,
                     child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: const BoxDecoration(
-                        color: TraceColors.gold,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.camera_alt,
-                        size: 16,
-                        color: TraceColors.navyBlue,
-                      ),
+                      width: 30, height: 30,
+                      decoration: const BoxDecoration(color: TraceColors.gold, shape: BoxShape.circle),
+                      child: const Icon(Icons.camera_alt, size: 16, color: TraceColors.navyBlue),
                     ),
                   ),
                 ],
@@ -557,126 +472,51 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
             ),
           ),
           const SizedBox(height: 24),
-
-          Text(
-            'Full Name',
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: TraceColors.medGrey,
-            ),
-          ),
+          Text('Full Name', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: TraceColors.medGrey)),
           const SizedBox(height: 6),
           TextField(
             controller: _nameCtrl,
             decoration: InputDecoration(
               hintText: 'Enter full name',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                  color: TraceColors.navyBlue,
-                  width: 2,
-                ),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: TraceColors.navyBlue, width: 2)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             ),
             style: GoogleFonts.inter(fontSize: 15, color: TraceColors.navyBlue),
           ),
           const SizedBox(height: 16),
-
-          Text(
-            'Student ID',
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: TraceColors.medGrey,
-            ),
-          ),
+          Text('Student ID', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: TraceColors.medGrey)),
           const SizedBox(height: 6),
           TextField(
-            controller: _idCtrl,
-            onChanged: _onIdChanged,
+            controller: TextEditingController(text: widget.student.studentId),
+            enabled: false,
             decoration: InputDecoration(
-              hintText: 'Enter Student ID',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: _idError != null
-                      ? TraceColors.error
-                      : TraceColors.navyBlue,
-                  width: 2,
-                ),
-              ),
-              errorText: _idError,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-              suffixIcon: _isCheckingId
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  : (_idError == null && _idCtrl.text.isNotEmpty
-                        ? const Icon(
-                            Icons.check_circle,
-                            color: TraceColors.success,
-                          )
-                        : null),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: TraceColors.lightGrey.withValues(alpha: 0.5))),
+              fillColor: TraceColors.lightGrey.withValues(alpha: 0.1),
+              filled: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              suffixIcon: const Icon(Icons.lock_outline, color: TraceColors.medGrey, size: 18),
             ),
-            style: GoogleFonts.inter(fontSize: 15, color: TraceColors.navyBlue),
+            style: GoogleFonts.inter(fontSize: 15, color: TraceColors.medGrey),
           ),
-
           if (_generalError != null) ...[
             const SizedBox(height: 8),
-            Text(
-              _generalError!,
-              style: GoogleFonts.inter(fontSize: 13, color: TraceColors.error),
-            ),
+            Text(_generalError!, style: GoogleFonts.inter(fontSize: 13, color: TraceColors.error)),
           ],
-
           const SizedBox(height: 28),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _isSaving || _idError != null ? null : _save,
+              onPressed: _isSaving ? null : _save,
               style: ElevatedButton.styleFrom(
                 backgroundColor: TraceColors.navyBlue,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
               child: _isSaving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Text(
-                      'Save Changes',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Text('Save Changes', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
             ),
           ),
         ],

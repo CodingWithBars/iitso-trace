@@ -31,7 +31,6 @@
   <link rel="icon" type="image/png" href="favicon.png"/>
 
   <title>trace</title>
-  <link rel="manifest" href="/manifest.json">
 </head>
 <body>
   <!--
@@ -42,6 +41,54 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <script>
+    window.deferredPwaPrompt = null;
+    window.isPwaInstalled = false;
+
+    window.checkIsPwaInstalled = function() {
+      const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+                          window.navigator.standalone === true ||
+                          document.referrer.includes('android-app://');
+      return isStandalone || window.isPwaInstalled;
+    };
+
+    window.hasDeferredPwaPrompt = function() {
+      return window.deferredPwaPrompt !== null;
+    };
+
+    window.addEventListener('beforeinstallprompt', function(e) {
+      e.preventDefault();
+      window.deferredPwaPrompt = e;
+      if (window.onPwaInstallable) {
+        window.onPwaInstallable();
+      }
+    });
+
+    window.addEventListener('appinstalled', function() {
+      window.deferredPwaPrompt = null;
+      window.isPwaInstalled = true;
+      if (window.onPwaInstalled) {
+        window.onPwaInstalled();
+      }
+    });
+
+    window.triggerPwaInstall = async function() {
+      if (window.deferredPwaPrompt) {
+        try {
+          window.deferredPwaPrompt.prompt();
+          const choiceResult = await window.deferredPwaPrompt.userChoice;
+          if (choiceResult.outcome === 'accepted') {
+            window.deferredPwaPrompt = null;
+            window.isPwaInstalled = true;
+            return true;
+          }
+        } catch (err) {
+          console.log('PWA prompt error:', err);
+        }
+      }
+      return false;
+    };
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

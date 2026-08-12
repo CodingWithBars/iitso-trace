@@ -24,6 +24,8 @@ class _WebRegistrationScreenState extends ConsumerState<WebRegistrationScreen> {
   final _idController = TextEditingController();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _pinController = TextEditingController();
+  final _confirmPinController = TextEditingController();
 
   bool _isLoading = false;
   Uint8List? _avatarBytes;
@@ -62,6 +64,8 @@ class _WebRegistrationScreenState extends ConsumerState<WebRegistrationScreen> {
     _idController.dispose();
     _nameController.dispose();
     _emailController.dispose();
+    _pinController.dispose();
+    _confirmPinController.dispose();
     super.dispose();
   }
 
@@ -189,6 +193,7 @@ class _WebRegistrationScreenState extends ConsumerState<WebRegistrationScreen> {
         yearLevel: _selectedYear ?? '',
         email: _emailController.text.trim(),
         avatarUrl: avatarUrl,
+        pin: _pinController.text.trim(),
       );
 
       if (docId == null) {
@@ -457,6 +462,36 @@ class _WebRegistrationScreenState extends ConsumerState<WebRegistrationScreen> {
                         validator: (v) =>
                             v == null ? 'Year level is required' : null,
                       ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _pinController,
+                        obscureText: true,
+                        keyboardType: TextInputType.number,
+                        maxLength: 6,
+                        decoration: const InputDecoration(
+                          labelText: 'Create 6-Digit PIN',
+                          prefixIcon: Icon(Icons.password_outlined),
+                          counterText: '',
+                        ),
+                        validator: (v) => v == null || v.length != 6
+                            ? 'Enter exactly 6 digits'
+                            : null,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _confirmPinController,
+                        obscureText: true,
+                        keyboardType: TextInputType.number,
+                        maxLength: 6,
+                        decoration: const InputDecoration(
+                          labelText: 'Confirm 6-Digit PIN',
+                          prefixIcon: Icon(Icons.password_outlined),
+                          counterText: '',
+                        ),
+                        validator: (v) => v != _pinController.text
+                            ? 'PINs do not match'
+                            : null,
+                      ),
                       const SizedBox(height: 24),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -488,6 +523,14 @@ class _WebRegistrationScreenState extends ConsumerState<WebRegistrationScreen> {
                                     onScrolledToBottom: () {
                                       if (mounted && !_hasReadTerms) {
                                         setState(() => _hasReadTerms = true);
+                                      }
+                                    },
+                                    onAccepted: () {
+                                      if (mounted) {
+                                        setState(() {
+                                          _hasReadTerms = true;
+                                          _acceptedTerms = true;
+                                        });
                                       }
                                     },
                                   ),

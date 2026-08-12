@@ -17,7 +17,8 @@ import 'dart:async';
 import '../widgets/scan_result_modal.dart';
 
 class ScannerScreen extends StatefulWidget {
-  const ScannerScreen({super.key});
+  final String? eventId;
+  const ScannerScreen({super.key, this.eventId});
 
   @override
   State<ScannerScreen> createState() => _ScannerScreenState();
@@ -132,6 +133,13 @@ class _ScannerScreenState extends State<ScannerScreen>
       _loadingEvents = false;
     });
     if (events.isNotEmpty) {
+      if (widget.eventId != null && _selectedEvent == null) {
+        final match = events.where((e) => e.id == widget.eventId);
+        if (match.isNotEmpty) {
+          _selectedEvent = match.first;
+        }
+      }
+      
       if (_selectedEvent == null) {
         setState(() => _selectedEvent = events.first);
       } else {
@@ -140,8 +148,60 @@ class _ScannerScreenState extends State<ScannerScreen>
           () => _selectedEvent = match.isNotEmpty ? match.first : events.first,
         );
       }
+      // Auto-select the correct phase based on current time
+      _autoDetectPhase();
     } else {
       setState(() => _selectedEvent = null);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Auto-detect phase based on current NTP time vs. event scheduled times
+  // ---------------------------------------------------------------------------
+  void _autoDetectPhase() {
+    if (_selectedEvent == null) return;
+    final event = _selectedEvent!;
+    final now = _networkNow;
+
+    final amIn = _parseScheduledTime(event.morningTimeIn, event.date);
+    final amOut = _parseScheduledTime(event.morningTimeOut, event.date);
+    final pmIn = _parseScheduledTime(event.afternoonTimeIn, event.date);
+    final pmOut = _parseScheduledTime(event.afternoonTimeOut, event.date);
+
+
+    ScanPhase detected = ScanPhase.timeInAm;
+    if (event.isWholeDay || event.isAmOnly) {
+      if (amOut != null && now.isAfter(amOut)) {
+        // Past morning time-out window → morning is over
+        detected = (event.isWholeDay || event.isPmOnly)
+            ? (pmOut != null && now.isAfter(pmOut)
+                ? ScanPhase.timeOutPm
+                : (pmIn != null && now.isAfter(pmIn)
+                    ? ScanPhase.timeOutPm
+                    : ScanPhase.timeInPm))
+            : ScanPhase.timeOutAm;
+      } else if (amIn != null && now.isAfter(amIn)) {
+        // During morning time-in window
+        if (amOut != null && _isTimeOutEnabled(event.morningTimeOut, event.date)) {
+          detected = ScanPhase.timeOutAm;
+        } else {
+          detected = ScanPhase.timeInAm;
+        }
+      } else {
+        detected = ScanPhase.timeInAm;
+      }
+    } else if (event.isPmOnly) {
+      if (pmIn != null && now.isAfter(pmIn)) {
+        detected = ScanPhase.timeOutPm;
+      } else {
+        detected = ScanPhase.timeInPm;
+      }
+    }
+
+    if (mounted && detected != _manualPhase) {
+      setState(() {
+        _manualPhase = detected;
+      });
     }
   }
 
@@ -618,8 +678,12 @@ class _ScannerScreenState extends State<ScannerScreen>
                                           ),
                                         )
                                         .toList(),
-                                    onChanged: (e) =>
-                                        setState(() => _selectedEvent = e),
+                                    onChanged: (e) {
+                                      setState(() {
+                                        _selectedEvent = e;
+                                      });
+                                      _autoDetectPhase();
+                                    },
                                   ),
                                 ),
                               ],

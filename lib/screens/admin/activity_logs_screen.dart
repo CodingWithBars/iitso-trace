@@ -18,13 +18,35 @@ class _ActivityLogsScreenState extends ConsumerState<ActivityLogsScreen> {
   String _searchQuery = '';
   String _sortBy = 'Newest';
   String _filterAction = 'All';
-  late final Stream<QuerySnapshot> _logsStream = ActivityLogService.stream();
   bool _canDelete = false;
+
+  int _currentLimit = 50;
+  late Stream<QuerySnapshot> _logsStream;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
+    _logsStream = ActivityLogService.stream(limit: _currentLimit);
+    _scrollController.addListener(_onScroll);
     _checkRole();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      // Load more
+      setState(() {
+        _currentLimit += 50;
+        _logsStream = ActivityLogService.stream(limit: _currentLimit);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _checkRole() async {
@@ -330,13 +352,23 @@ class _ActivityLogsScreenState extends ConsumerState<ActivityLogsScreen> {
                         ),
                       )
                     : ListView.separated(
+                        controller: _scrollController,
                         padding: const EdgeInsets.all(16),
-                        itemCount: filteredDocs.length,
+                        itemCount: filteredDocs.length + (filteredDocs.length >= _currentLimit ? 1 : 0),
                         separatorBuilder: (context, index) => const Divider(
                           height: 1,
                           color: TraceColors.lightGrey,
                         ),
                         itemBuilder: (context, index) {
+                          if (index == filteredDocs.length) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 20),
+                              child: Center(
+                                child: CircularProgressIndicator(color: TraceColors.navyBlue),
+                              ),
+                            );
+                          }
+
                           final doc = filteredDocs[index];
                           final data = doc.data() as Map<String, dynamic>;
                           final timestamp = data['timestamp'] as Timestamp?;

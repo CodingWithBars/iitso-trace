@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -23,8 +22,12 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
   final _idController = TextEditingController();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _pinController = TextEditingController();
+  final _confirmPinController = TextEditingController();
 
   bool _isLoading = false;
+  bool _obscurePin = true;
+  bool _obscureConfirmPin = true;
   Uint8List? _avatarBytes;
   final ImagePicker _picker = ImagePicker();
 
@@ -61,6 +64,8 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
     _idController.dispose();
     _nameController.dispose();
     _emailController.dispose();
+    _pinController.dispose();
+    _confirmPinController.dispose();
     super.dispose();
   }
 
@@ -173,12 +178,13 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
 
     setState(() => _isLoading = true);
     try {
+      // Upload avatar to Firebase Storage; falls back to base64 if Storage unavailable
       String? avatarUrl;
       if (_avatarBytes != null) {
-        // Bypass Firebase Storage completely by using a Base64 string!
-        // The image is heavily compressed (max 256x256, quality 50) so it easily fits within Firestore's 1MB document limit.
-        final base64String = base64Encode(_avatarBytes!);
-        avatarUrl = 'data:image/jpeg;base64,$base64String';
+        avatarUrl = await StudentService.uploadAvatar(
+          _avatarBytes!,
+          _idController.text.trim(),
+        );
       }
 
       final docId = await StudentService.registerStudent(
@@ -188,6 +194,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
         yearLevel: _selectedYear ?? '',
         email: _emailController.text.trim(),
         avatarUrl: avatarUrl,
+        pin: _pinController.text.trim(),
       );
 
       if (docId == null) {
@@ -456,6 +463,66 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                         validator: (v) =>
                             v == null ? 'Year level is required' : null,
                       ),
+                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
+                      _sectionLabel('Account Security'),
+                      const SizedBox(height: 4),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12, top: 4),
+                        child: Text(
+                          'Set a 4–6 digit PIN to secure your student account.',
+                          style: GoogleFonts.inter(fontSize: 12, color: TraceColors.medGrey),
+                        ),
+                      ),
+                      TextFormField(
+                        controller: _pinController,
+                        obscureText: _obscurePin,
+                        keyboardType: TextInputType.number,
+                        maxLength: 6,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        decoration: InputDecoration(
+                          labelText: 'PIN (4–6 digits)',
+                          prefixIcon: const Icon(Icons.pin_outlined),
+                          counterText: '',
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePin ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              color: TraceColors.medGrey,
+                            ),
+                            onPressed: () => setState(() => _obscurePin = !_obscurePin),
+                          ),
+                        ),
+                        validator: (v) {
+                          if (v == null || v.isEmpty) return 'PIN is required';
+                          if (v.length < 4) return 'PIN must be at least 4 digits';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _confirmPinController,
+                        obscureText: _obscureConfirmPin,
+                        keyboardType: TextInputType.number,
+                        maxLength: 6,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        decoration: InputDecoration(
+                          labelText: 'Confirm PIN',
+                          prefixIcon: const Icon(Icons.lock_outline_rounded),
+                          counterText: '',
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureConfirmPin ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              color: TraceColors.medGrey,
+                            ),
+                            onPressed: () => setState(() => _obscureConfirmPin = !_obscureConfirmPin),
+                          ),
+                        ),
+                        validator: (v) {
+                          if (v == null || v.isEmpty) return 'Please confirm your PIN';
+                          if (v != _pinController.text) return 'PINs do not match';
+                          return null;
+                        },
+                      ),
                       const SizedBox(height: 24),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -487,6 +554,14 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                                     onScrolledToBottom: () {
                                       if (mounted && !_hasReadTerms) {
                                         setState(() => _hasReadTerms = true);
+                                      }
+                                    },
+                                    onAccepted: () {
+                                      if (mounted) {
+                                        setState(() {
+                                          _hasReadTerms = true;
+                                          _acceptedTerms = true;
+                                        });
                                       }
                                     },
                                   ),

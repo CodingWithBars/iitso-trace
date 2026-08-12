@@ -194,7 +194,10 @@ class _StudentIdScreenState extends ConsumerState<StudentIdScreen> {
               const SizedBox(height: 24),
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final qrSize = (constraints.maxWidth - 48).clamp(160.0, 288.0);
+                  final qrSize = (constraints.maxWidth - 48).clamp(
+                    160.0,
+                    288.0,
+                  );
                   return Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -334,25 +337,19 @@ class _EditProfileSheet extends StatefulWidget {
 
 class _EditProfileSheetState extends State<_EditProfileSheet> {
   late TextEditingController _nameCtrl;
-  late TextEditingController _idCtrl;
   Uint8List? _pickedBytes;
-  String? _pickedBase64;
   bool _isSaving = false;
-  bool _isCheckingId = false;
-  String? _idError;
   String? _generalError;
 
   @override
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.student.name);
-    _idCtrl = TextEditingController(text: widget.student.studentId);
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _idCtrl.dispose();
     super.dispose();
   }
 
@@ -364,78 +361,36 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     );
     if (file == null) return;
     final bytes = await file.readAsBytes();
-    setState(() {
-      _pickedBytes = bytes;
-      _pickedBase64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-    });
-  }
-
-  Future<void> _onIdChanged(String val) async {
-    if (val.trim() == widget.student.studentId) {
-      setState(() => _idError = null);
-      return;
-    }
-    setState(() {
-      _isCheckingId = true;
-      _idError = null;
-    });
-    final taken = await StudentService.isStudentIdTaken(
-      val.trim(),
-      excludeDocId: widget.student.id,
-    );
-    if (mounted) {
-      setState(() {
-        _isCheckingId = false;
-        _idError = taken ? 'ID already used' : null;
-      });
-    }
+    setState(() => _pickedBytes = bytes);
   }
 
   Future<void> _save() async {
     final name = _nameCtrl.text.trim();
-    final id = _idCtrl.text.trim();
-    if (name.isEmpty || id.isEmpty) {
-      setState(() => _generalError = 'Name and Student ID cannot be empty.');
+    if (name.isEmpty) {
+      setState(() => _generalError = 'Name cannot be empty.');
       return;
     }
-    if (_idError != null) return;
     setState(() {
       _isSaving = true;
       _generalError = null;
     });
     try {
-      if (id != widget.student.studentId) {
-        final taken = await StudentService.isStudentIdTaken(
-          id,
-          excludeDocId: widget.student.id,
-        );
-        if (taken) {
-          setState(() {
-            _idError = 'ID already used';
-            _isSaving = false;
-          });
-          return;
-        }
-      }
       String? newAvatarUrl;
       if (_pickedBytes != null) {
-        try {
-          newAvatarUrl =
-              await StudentService.uploadAvatar(_pickedBytes!, id) ??
-              _pickedBase64;
-        } catch (_) {
-          newAvatarUrl = _pickedBase64;
-        }
+        // Upload to Firebase Storage; service handles fallback
+        newAvatarUrl = await StudentService.uploadAvatar(
+          _pickedBytes!,
+          widget.student.studentId,
+        );
       }
       await StudentService.updateStudentProfile(
         docId: widget.student.id,
         name: name,
-        studentId: id,
         avatarUrl: newAvatarUrl,
       );
       final updated = Student(
         id: widget.student.id,
-        studentId: id,
+        studentId: widget.student.studentId, // ID is immutable from here
         name: name,
         course: widget.student.course,
         yearLevel: widget.student.yearLevel,
@@ -590,54 +545,56 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
           ),
           const SizedBox(height: 16),
 
-          Text(
-            'Student ID',
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: TraceColors.medGrey,
+          // Student ID is locked — displayed read-only
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: TraceColors.offWhite,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: TraceColors.lightGrey),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.badge_outlined,
+                  color: TraceColors.medGrey,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Student ID',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: TraceColors.medGrey,
+                        ),
+                      ),
+                      Text(
+                        widget.student.studentId,
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          color: TraceColors.navyBlue,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.lock_rounded,
+                  color: TraceColors.medGrey,
+                  size: 16,
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _idCtrl,
-            onChanged: _onIdChanged,
-            decoration: InputDecoration(
-              hintText: 'Enter Student ID',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: _idError != null
-                      ? TraceColors.error
-                      : TraceColors.navyBlue,
-                  width: 2,
-                ),
-              ),
-              errorText: _idError,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-              suffixIcon: _isCheckingId
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  : (_idError == null && _idCtrl.text.isNotEmpty
-                        ? const Icon(
-                            Icons.check_circle,
-                            color: TraceColors.success,
-                          )
-                        : null),
-            ),
-            style: GoogleFonts.inter(fontSize: 15, color: TraceColors.navyBlue),
+          const SizedBox(height: 4),
+          Text(
+            'To change your Student ID, submit an ID Claim via the Org admin.',
+            style: GoogleFonts.inter(fontSize: 11, color: TraceColors.medGrey),
           ),
 
           if (_generalError != null) ...[
@@ -652,7 +609,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _isSaving || _idError != null ? null : _save,
+              onPressed: _isSaving ? null : _save,
               style: ElevatedButton.styleFrom(
                 backgroundColor: TraceColors.navyBlue,
                 padding: const EdgeInsets.symmetric(vertical: 16),

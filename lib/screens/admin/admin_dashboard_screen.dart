@@ -65,7 +65,16 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width > 900;
-    final authService = ref.read(authServiceProvider);
+    final authService = ref.watch(authServiceProvider);
+
+    // ── Safety net: if Firebase auth becomes null (e.g. token expired or
+    //    signOut called), immediately redirect to login even if the user
+    //    presses the Android back button back into this screen.
+    ref.listen<AsyncValue<dynamic>>(authStateProvider, (_, next) {
+      if (next.valueOrNull == null && context.mounted) {
+        context.go('/admin/login');
+      }
+    });
 
     return Scaffold(
       backgroundColor: TraceColors.offWhite,

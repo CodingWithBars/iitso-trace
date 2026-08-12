@@ -43,10 +43,10 @@ class ActivityLogService {
     }
   }
 
-  /// Streams the 50 most recent log entries, newest first.
-  static Stream<QuerySnapshot> stream() => FirestoreService.db
+  /// Streams the most recent log entries, newest first.
+  static Stream<QuerySnapshot> stream({int limit = 50}) => FirestoreService.db
       .collection(_col)
       .orderBy('timestamp', descending: true)
-      .limit(50)
+      .limit(limit)
       .snapshots();
 }

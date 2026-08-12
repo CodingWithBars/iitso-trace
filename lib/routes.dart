@@ -13,6 +13,7 @@ import 'screens/scanner_screen.dart';
 import 'screens/admin/admin_login_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/admin/admin_profile_screen.dart';
+import 'screens/admin/admin_student_profile_screen.dart';
 import 'screens/admin/sync_center_screen.dart';
 import 'screens/admin/manage_admins_screen.dart';
 import 'screens/admin/students_list_screen.dart';
@@ -29,6 +30,7 @@ import 'screens/privacy_policy_screen.dart';
 import 'screens/terms_conditions_screen.dart';
 import 'services/auth_service.dart';
 
+import 'screens/splash_screen.dart';
 import 'screens/web/web_student_login_screen.dart';
 import 'screens/web/web_admin_login_screen.dart';
 import 'screens/web/web_registration_screen.dart';
@@ -40,23 +42,56 @@ import 'screens/web/web_scanner_screen.dart';
 import 'widgets/desktop_mobile_wrapper.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
+  // ── Auth-stream notifier: tells GoRouter to re-run redirect whenever
+  //    Firebase auth state changes (login / logout). Without this, the
+  //    redirect callback only fires on explicit navigation, so pressing
+  //    Android back after logout would re-show the admin dashboard.
+  final authNotifier = _AuthChangeNotifier(ref);
+
   return GoRouter(
-    initialLocation: '/',
+    initialLocation: '/splash',
+    refreshListenable: authNotifier,
     redirect: (BuildContext context, GoRouterState state) {
-      final isLoggedIn = ref.read(authServiceProvider).currentUser != null;
+      if (state.uri.path == '/splash') return null;
+
+      // Use the stream value — reactive to signOut()
+      final isLoggedIn =
+          ref.read(authStateProvider).valueOrNull != null;
       final isAdminRoute =
           state.uri.path.startsWith('/admin') &&
           state.uri.path != '/admin/login';
       final isScannerRoute = state.uri.path == '/scanner';
 
-      // Protect admin dashboard and scanner — require login
+      // Redirect to login if accessing protected route without auth
       if ((isAdminRoute || isScannerRoute) && !isLoggedIn) {
         return '/admin/login';
+      }
+
+      // If logged-in admin somehow lands on /admin/login, redirect to dashboard
+      if (state.uri.path == '/admin/login' && isLoggedIn) {
+        return '/admin/dashboard';
       }
 
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/splash',
+        pageBuilder: (context, state) => CustomTransitionPage<void>(
+          key: state.pageKey,
+          child: const SplashScreen(),
+          transitionDuration: const Duration(milliseconds: 300),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOut,
+              ),
+              child: child,
+            );
+          },
+        ),
+      ),
       // Public routes
       GoRoute(
         path: '/',
@@ -135,6 +170,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const StudentsListScreen(),
       ),
       GoRoute(
+        path: '/admin/students/:studentId',
+        builder: (context, state) => AdminStudentProfileScreen(
+          studentId: state.pathParameters['studentId']!,
+        ),
+      ),
+      GoRoute(
         path: '/admin/attendance',
         builder: (context, state) => const AttendanceEventsScreen(),
       ),
@@ -181,9 +222,24 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/scanner',
-        builder: (context, state) =>
-            kIsWeb ? const WebScannerScreen() : const ScannerScreen(),
+        builder: (context, state) {
+          final eventId = state.uri.queryParameters['eventId'];
+          return kIsWeb
+              ? const WebScannerScreen()
+              : ScannerScreen(eventId: eventId);
+        },
       ),
     ],
   );
 });
+
+/// Bridges the Firebase auth stream into a [ChangeNotifier] so GoRouter's
+/// [refreshListenable] re-evaluates redirect guards on every auth state change
+/// (login / logout), including when the user presses the Android back button.
+class _AuthChangeNotifier extends ChangeNotifier {
+  _AuthChangeNotifier(Ref ref) {
+    ref.listen<AsyncValue<dynamic>>(authStateProvider, (_, _) {
+      notifyListeners();
+    });
+  }
+}
