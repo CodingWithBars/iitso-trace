@@ -318,6 +318,15 @@ class _StudentIdScreenState extends ConsumerState<StudentIdScreen> {
     return Image.network(
       url,
       fit: BoxFit.cover,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return const Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: TraceColors.gold,
+          ),
+        );
+      },
       errorBuilder: (_, _, _) =>
           const Icon(Icons.person, size: 54, color: TraceColors.lightGrey),
     );

@@ -1,12 +1,15 @@
 {
-    "name": "trace",
-    "short_name": "trace",
-    "start_url": ".",
+    "name": "TRACE — Campus Attendance & Student Records",
+    "short_name": "TRACE",
+    "start_url": "/",
+    "scope": "/",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "display_override": ["standalone", "minimal-ui"],
+    "background_color": "#050505",
+    "theme_color": "#050505",
+    "description": "Transparent Records & Attendance for Campus Events",
+    "orientation": "any",
+    "categories": ["education", "productivity", "utilities"],
     "prefer_related_applications": false,
     "icons": [
         {

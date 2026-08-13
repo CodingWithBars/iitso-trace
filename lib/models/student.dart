@@ -7,6 +7,7 @@ class Student {
   final String qrHash;
   final String email;
   final String avatarUrl;
+  final bool isArchived;
 
   Student({
     required this.id,
@@ -17,6 +18,7 @@ class Student {
     required this.qrHash,
     this.email = '',
     this.avatarUrl = '',
+    this.isArchived = false,
   });
 
   factory Student.fromMap(Map<String, dynamic> data, String documentId) {
@@ -29,6 +31,7 @@ class Student {
       qrHash: data['qr_hash'] ?? '',
       email: data['email'] ?? '',
       avatarUrl: data['avatar_url'] ?? '',
+      isArchived: data['is_archived'] ?? false,
     );
   }
 
@@ -41,6 +44,7 @@ class Student {
       'qr_hash': qrHash,
       'email': email,
       'avatar_url': avatarUrl,
+      'is_archived': isArchived,
     };
   }
 }

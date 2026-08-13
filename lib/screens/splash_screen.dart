@@ -77,8 +77,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       // ── Step 5: Preload landing screen assets in background during splash
       _preloadLandingAssets();
 
-      // ── Step 6: Hold for 12 seconds then trigger smooth fade-out exit
-      _timer = Timer(const Duration(seconds: 12), _startExitSequence);
+      // ── Step 6: Hold for 2.8 seconds then trigger smooth fade-out exit
+      _timer = Timer(const Duration(milliseconds: 2800), _startExitSequence);
     });
   }
 
@@ -102,6 +102,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   Future<void> _startExitSequence() async {
     if (!mounted) return;
+    if (_fadeOutController.isAnimating || _fadeOutController.isCompleted) return;
     _timer?.cancel();
 
     // Play the black curtain fade-out overlay before navigating
@@ -130,73 +131,77 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
     return Scaffold(
       backgroundColor: const Color(0xFF050505),
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // ── Layer 1: Gradient background (always visible, no stutter)
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFF050505), // Deep luxury black top
-                  Color(0xFF160A04), // Dark chocolate transition
-                  Color(0xFF3E1505), // Rich dark orange middle
-                  Color(0xFF8B2500), // Burnt orange bottom gradient
-                  Color(0xFFFF5722), // Vibrant accent orange base
-                ],
-                stops: [0.0, 0.35, 0.65, 0.90, 1.0],
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _startExitSequence,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // ── Layer 1: Gradient background (always visible, no stutter)
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0xFF050505), // Deep luxury black top
+                    Color(0xFF160A04), // Dark chocolate transition
+                    Color(0xFF3E1505), // Rich dark orange middle
+                    Color(0xFF8B2500), // Burnt orange bottom gradient
+                    Color(0xFFFF5722), // Vibrant accent orange base
+                  ],
+                  stops: [0.0, 0.35, 0.65, 0.90, 1.0],
+                ),
               ),
             ),
-          ),
 
-          // ── Layer 2: Centered GIF logo with fade-in
-          FadeTransition(
-            opacity: _fadeInAnimation,
-            child: Center(
-              child: _gifReady
-                  ? Container(
-                      width: logoSize,
-                      height: logoSize,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFFF5722).withValues(
-                              alpha: 0.35,
+            // ── Layer 2: Centered GIF logo with fade-in
+            FadeTransition(
+              opacity: _fadeInAnimation,
+              child: Center(
+                child: _gifReady
+                    ? Container(
+                        width: logoSize,
+                        height: logoSize,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFF5722).withValues(
+                                alpha: 0.35,
+                              ),
+                              blurRadius: 30,
+                              spreadRadius: 3,
                             ),
-                            blurRadius: 30,
-                            spreadRadius: 3,
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        // ── SplashGifWidget: Web → HtmlElementView (native browser GIF)
-                        //                    Mobile → Image.asset
-                        child: SplashGifWidget(size: logoSize),
-                      ),
-                    )
-                  : const SizedBox.shrink(),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          // ── SplashGifWidget: Web → HtmlElementView (native browser GIF)
+                          //                    Mobile → Image.asset
+                          child: SplashGifWidget(size: logoSize),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
             ),
-          ),
 
-          // ── Layer 3: Black fade-out curtain (plays before navigation)
-          AnimatedBuilder(
-            animation: _fadeOutAnimation,
-            builder: (context, _) {
-              if (_fadeOutAnimation.value == 0) return const SizedBox.shrink();
-              return Opacity(
-                opacity: _fadeOutAnimation.value,
-                child: const ColoredBox(
-                  color: Color(0xFF050505),
-                  child: SizedBox.expand(),
-                ),
-              );
-            },
-          ),
-        ],
+            // ── Layer 3: Black fade-out curtain (plays before navigation)
+            AnimatedBuilder(
+              animation: _fadeOutAnimation,
+              builder: (context, _) {
+                if (_fadeOutAnimation.value == 0) return const SizedBox.shrink();
+                return Opacity(
+                  opacity: _fadeOutAnimation.value,
+                  child: const ColoredBox(
+                    color: Color(0xFF050505),
+                    child: SizedBox.expand(),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

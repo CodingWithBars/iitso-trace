@@ -105,7 +105,7 @@ class _ClaimCardState extends State<_ClaimCard> {
     final claimantName = widget.data['claimant_name'] as String? ?? '';
     final claimantEmail = widget.data['claimant_email'] as String? ?? '';
 
-    final confirm = await showDialog<bool>(
+    final result = await showDialog<String>(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: Colors.white,
@@ -117,25 +117,34 @@ class _ClaimCardState extends State<_ClaimCard> {
           ),
         ),
         content: Text(
-          'This will update Student ID "$claimedId":\n• Name → "$claimantName"\n• Email → "$claimantEmail"\n\nThis cannot be undone easily.',
+          'How do you want to handle the records for Student ID "$claimedId"?\n\n'
+          '• Restore Records: (For legitimate students recovering their account) Keep their old attendance/payments, just update their email to "$claimantEmail".\n\n'
+          '• Discard Records: (For kicking out fraudsters) Archive the old records away from this ID, giving the legitimate student a fresh empty account.',
           style: GoogleFonts.inter(fontSize: 14, color: TraceColors.navyBlue),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(context, 'cancel'),
             child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'discard'),
+            style: TextButton.styleFrom(foregroundColor: TraceColors.error),
+            child: const Text('Discard'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: TraceColors.success,
             ),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Approve', style: TextStyle(color: Colors.white)),
+            onPressed: () => Navigator.pop(context, 'restore'),
+            child: const Text('Restore', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
-    if (confirm != true) return;
+
+    if (result == null || result == 'cancel') return;
+    final keepRecords = result == 'restore';
 
     setState(() => _isProcessing = true);
     try {
@@ -149,6 +158,7 @@ class _ClaimCardState extends State<_ClaimCard> {
         studentDocId: snap.docs.first.id,
         newName: claimantName,
         newEmail: claimantEmail,
+        keepRecords: keepRecords,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

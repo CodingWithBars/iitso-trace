@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/attendance_service.dart';
 import '../../models/attendance.dart';
 import '../../theme/app_theme.dart';
+import '../../models/event.dart';
 import '../../widgets/shared_widgets.dart';
 import '../../services/csv_report_service.dart';
 
@@ -25,14 +26,15 @@ class StudentAttendanceDisplay {
 class _EventAttendanceScreenState extends State<EventAttendanceScreen> {
   bool _isLoading = true;
   String _eventName = 'Attendance';
+  Event? _event;
 
   List<Attendance> _allAttendance = [];
   final Map<String, Map<String, dynamic>> _studentsMap = {};
 
   String _searchQuery = '';
-  String _selectedProgram = 'All';
+  String _selectedYear = 'All';
   String _statusFilter = 'Present'; // 'Present', 'Absent', 'All'
-  final List<String> _programs = ['All', 'BSBA', 'BSA', 'BTLED', 'BSIT'];
+  final List<String> _years = ['All', '1st Year', '2nd Year', '3rd Year', '4th Year'];
 
   @override
   void initState() {
@@ -48,7 +50,8 @@ class _EventAttendanceScreenState extends State<EventAttendanceScreen> {
           .doc(widget.eventId)
           .get();
       if (eventDoc.exists) {
-        _eventName = eventDoc.data()?['event_name'] ?? 'Attendance';
+        _event = Event.fromMap(eventDoc.data()!, eventDoc.id);
+        _eventName = _event?.eventName ?? 'Attendance';
       }
 
       // 2. Fetch attendance
@@ -70,14 +73,14 @@ class _EventAttendanceScreenState extends State<EventAttendanceScreen> {
     }
   }
 
-  Map<String, int> _getProgramTotals() {
-    final totals = {'BSBA': 0, 'BSA': 0, 'BSIT': 0, 'BTLED': 0};
+  Map<String, int> _getYearTotals() {
+    final totals = {'1ST YEAR': 0, '2ND YEAR': 0, '3RD YEAR': 0, '4TH YEAR': 0};
     for (var att in _allAttendance) {
       final studentData = _studentsMap[att.studentId];
       if (studentData != null) {
-        final course = (studentData['course']?.toString() ?? '').toUpperCase();
-        if (totals.containsKey(course)) {
-          totals[course] = totals[course]! + 1;
+        final year = (studentData['year_level']?.toString() ?? '').toUpperCase();
+        if (totals.containsKey(year)) {
+          totals[year] = totals[year]! + 1;
         }
       }
     }
@@ -97,12 +100,17 @@ class _EventAttendanceScreenState extends State<EventAttendanceScreen> {
       if (_statusFilter == 'Present' && !isPresent) continue;
       if (_statusFilter == 'Absent' && isPresent) continue;
 
-      final course = (studentData['course']?.toString() ?? '').toUpperCase();
+      final year = (studentData['year_level']?.toString() ?? '').toLowerCase();
       final name = (studentData['name']?.toString() ?? '').toLowerCase();
       final studentIdStr = (studentData['student_id']?.toString() ?? '').toLowerCase();
 
-      // Program filter
-      if (_selectedProgram != 'All' && course != _selectedProgram) continue;
+      // Year filter
+      if (_selectedYear != 'All') {
+        final selectedYearLower = _selectedYear.toLowerCase();
+        if (year != selectedYearLower) {
+          continue;
+        }
+      }
 
       // Search filter
       if (_searchQuery.isNotEmpty) {
@@ -130,7 +138,7 @@ class _EventAttendanceScreenState extends State<EventAttendanceScreen> {
       );
     }
 
-    final totals = _getProgramTotals();
+    final totals = _getYearTotals();
     final filteredData = _getFilteredData();
 
     return Scaffold(
@@ -138,13 +146,13 @@ class _EventAttendanceScreenState extends State<EventAttendanceScreen> {
       appBar: TraceAppBar(title: _eventName),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: TraceColors.gold,
-        onPressed: () {
+        onPressed: () async {
           // Pass the filtered present attendance to the CSV export
           final presentAttendance = filteredData
               .where((d) => d.attendance != null)
               .map((d) => d.attendance!)
               .toList();
-          CsvReportService.generateAttendanceCsv(
+          await CsvReportService.generateAttendanceCsv(
             presentAttendance,
             _studentsMap,
           );
@@ -170,7 +178,7 @@ class _EventAttendanceScreenState extends State<EventAttendanceScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Program Attendance',
+                    'Year Level Attendance',
                     style: GoogleFonts.inter(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -182,11 +190,11 @@ class _EventAttendanceScreenState extends State<EventAttendanceScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: _buildProgramStat('BSBA', totals['BSBA'] ?? 0),
+                        child: _buildProgramStat('1st Year', totals['1ST YEAR'] ?? 0),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: _buildProgramStat('BSA', totals['BSA'] ?? 0),
+                        child: _buildProgramStat('2nd Year', totals['2ND YEAR'] ?? 0),
                       ),
                     ],
                   ),
@@ -194,11 +202,11 @@ class _EventAttendanceScreenState extends State<EventAttendanceScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: _buildProgramStat('BSIT', totals['BSIT'] ?? 0),
+                        child: _buildProgramStat('3rd Year', totals['3RD YEAR'] ?? 0),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: _buildProgramStat('BTLED', totals['BTLED'] ?? 0),
+                        child: _buildProgramStat('4th Year', totals['4TH YEAR'] ?? 0),
                       ),
                     ],
                   ),
@@ -247,7 +255,7 @@ class _EventAttendanceScreenState extends State<EventAttendanceScreen> {
                         ),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
-                            value: _selectedProgram,
+                            value: _selectedYear,
                             icon: const Icon(
                               Icons.filter_list,
                               color: TraceColors.navyBlue,
@@ -257,17 +265,17 @@ class _EventAttendanceScreenState extends State<EventAttendanceScreen> {
                               fontWeight: FontWeight.w600,
                               color: TraceColors.navyBlue,
                             ),
-                            items: _programs
+                            items: _years
                                 .map(
-                                  (p) => DropdownMenuItem(
-                                    value: p,
-                                    child: Text(p),
+                                  (y) => DropdownMenuItem(
+                                    value: y,
+                                    child: Text(y),
                                   ),
                                 )
                                 .toList(),
                             onChanged: (val) {
                               if (val != null) {
-                                setState(() => _selectedProgram = val);
+                                setState(() => _selectedYear = val);
                               }
                             },
                           ),
@@ -422,16 +430,26 @@ class _EventAttendanceScreenState extends State<EventAttendanceScreen> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: TraceColors.error.withValues(alpha: 0.1),
+                                    color: _event?.computedStatus == 'upcoming'
+                                        ? TraceColors.gold.withValues(alpha: 0.1)
+                                        : TraceColors.error.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: TraceColors.error.withValues(alpha: 0.3)),
+                                    border: Border.all(
+                                      color: _event?.computedStatus == 'upcoming'
+                                          ? TraceColors.gold.withValues(alpha: 0.3)
+                                          : TraceColors.error.withValues(alpha: 0.3),
+                                    ),
                                   ),
                                   child: Text(
-                                    'ABSENT',
+                                    _event?.computedStatus == 'upcoming'
+                                        ? 'PENDING'
+                                        : 'ABSENT',
                                     style: GoogleFonts.inter(
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
-                                      color: TraceColors.error,
+                                      color: _event?.computedStatus == 'upcoming'
+                                          ? TraceColors.gold
+                                          : TraceColors.error,
                                     ),
                                   ),
                                 ),

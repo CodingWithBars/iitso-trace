@@ -20,4 +20,7 @@ echo "Building Flutter Web..."
 # Using --release and offline-first caching for instant load performance
 flutter build web --release --pwa-strategy=offline-first
 
+# Ensure custom manifest.json is preserved in build output
+cp web/manifest.json build/web/manifest.json
+
 echo "Build complete."

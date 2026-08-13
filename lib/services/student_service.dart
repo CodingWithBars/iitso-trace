@@ -109,8 +109,9 @@ class StudentService {
       );
       return await uploadTask.ref.getDownloadURL();
     } catch (e) {
-      debugPrint('Storage upload failed: $e');
-      return null;
+      debugPrint('Storage upload failed, falling back to base64: $e');
+      final base64String = base64Encode(imageBytes);
+      return 'data:image/jpeg;base64,$base64String';
     }
   }
 
@@ -286,52 +287,99 @@ class StudentService {
     );
   }
 
-  /// Admin: approves a claim — archives the wrong owner and creates a new account for the claimant.
+  /// Admin: approves a claim.
+  /// If [keepRecords] is true, restores the account (updates email and un-archives it).
+  /// If [keepRecords] is false, archives the old user's records to their old email and creates a fresh account for the claimant.
   static Future<void> approveIdClaim({
     required String claimDocId,
     required String studentDocId,
     required String newName,
     required String newEmail,
+    required bool keepRecords,
   }) async {
     final batch = FirestoreService.db.batch();
 
-    // 1. Get the existing (wrong) student document to archive it
+    // 1. Get the existing student document
     final oldDocSnap = await FirestoreService.students.doc(studentDocId).get();
     if (!oldDocSnap.exists) throw Exception('Student document not found');
     final oldData = oldDocSnap.data() as Map<String, dynamic>;
     final oldEmail = oldData['email'] as String;
     final claimedStudentId = oldData['student_id'] as String;
 
-    // 2. Update the old document to use the archived ID
-    final archivedId = 'archived_$oldEmail';
-    batch.update(oldDocSnap.reference, {
-      'student_id': archivedId,
-    });
+    if (keepRecords) {
+      // Restore Mode: Just update the existing document's email/name and un-archive
+      batch.update(oldDocSnap.reference, {
+        'email': newEmail,
+        'name': newName,
+        'pin_hash': '', // Force new PIN on login
+        'is_archived': false,
+        'avatar_url': '', // Reset avatar so they can upload a new one
+      });
 
-    // 3. Query all attendance records for this student_id and update them to the archived ID
-    final attendanceSnap = await FirestoreService.attendance
-        .where('student_id', isEqualTo: claimedStudentId)
-        .get();
-    
-    for (var doc in attendanceSnap.docs) {
-      batch.update(doc.reference, {'student_id': archivedId});
+      await ActivityLogService.log(
+        action: 'id_claim_approved',
+        message: 'ID claim APPROVED (Restore Mode): Restored account for $claimedStudentId with new email $newEmail.',
+        entityType: 'claim',
+        entityId: claimDocId,
+        actorName: 'Admin',
+      );
+    } else {
+      // Discard Mode: Archive old records and create fresh account
+      final archivedId = 'archived_$oldEmail';
+      batch.update(oldDocSnap.reference, {
+        'student_id': archivedId,
+      });
+
+      // Update attendance
+      final attendanceSnap = await FirestoreService.attendance
+          .where('student_id', isEqualTo: claimedStudentId)
+          .get();
+      for (var doc in attendanceSnap.docs) {
+        batch.update(doc.reference, {'student_id': archivedId});
+      }
+
+      // Update obligations
+      final obligationsSnap = await FirestoreService.db
+          .collection('student_obligations')
+          .where('student_id', isEqualTo: claimedStudentId)
+          .get();
+      for (var doc in obligationsSnap.docs) {
+        batch.update(doc.reference, {'student_id': archivedId});
+      }
+
+      // Update payments
+      final paymentsSnap = await FirestoreService.db
+          .collection('payment_records')
+          .where('student_id', isEqualTo: claimedStudentId)
+          .get();
+      for (var doc in paymentsSnap.docs) {
+        batch.update(doc.reference, {'student_id': archivedId});
+      }
+
+      // Create new fresh account
+      final newStudentRef = FirestoreService.students.doc();
+      batch.set(newStudentRef, {
+        'student_id': claimedStudentId,
+        'name': newName,
+        'course': oldData['course'] ?? '',
+        'year_level': oldData['year_level'] ?? '',
+        'email': newEmail,
+        'avatar_url': '',
+        'qr_hash': const Uuid().v4(),
+        'pin_hash': '', 
+        'registered_at': FieldValue.serverTimestamp(),
+      });
+
+      await ActivityLogService.log(
+        action: 'id_claim_approved',
+        message: 'ID claim APPROVED (Discard Mode): Created new account for $newName and archived old data for $oldEmail.',
+        entityType: 'claim',
+        entityId: claimDocId,
+        actorName: 'Admin',
+      );
     }
 
-    // 4. Create a brand new document for the legitimate claimant
-    final newStudentRef = FirestoreService.students.doc();
-    batch.set(newStudentRef, {
-      'student_id': claimedStudentId,
-      'name': newName,
-      'course': oldData['course'] ?? '',
-      'year_level': oldData['year_level'] ?? '',
-      'email': newEmail,
-      'avatar_url': '',
-      'qr_hash': const Uuid().v4(),
-      'pin_hash': '', // Empty so they are forced to set a PIN upon first login
-      'registered_at': FieldValue.serverTimestamp(),
-    });
-
-    // 5. Update the claim status
+    // Update the claim status
     batch.update(FirestoreService.db.collection('id_claims').doc(claimDocId), {
       'status': 'approved',
       'resolved_at': FieldValue.serverTimestamp(),
@@ -339,18 +387,9 @@ class StudentService {
 
     await batch.commit();
 
-    await ActivityLogService.log(
-      action: 'id_claim_approved',
-      message:
-          'ID claim APPROVED: Created new account for $newName and archived old data for $oldEmail.',
-      entityType: 'claim',
-      entityId: claimDocId,
-      actorName: 'Admin',
-    );
     await NotificationService.createInAppNotification(
       title: 'ID Claim Approved',
-      body:
-          'Your claim for Student ID has been approved. You can now log in using your ID and email.',
+      body: 'Your claim for Student ID has been approved. You can now log in using your ID and email.',
       targetRole: 'student',
       entityType: 'claim',
       entityId: claimDocId,
@@ -378,6 +417,7 @@ class StudentService {
       final snap = await FirestoreService.students.get();
       return snap.docs
           .map((d) => Student.fromMap(d.data() as Map<String, dynamic>, d.id))
+          .where((s) => s.isArchived != true)
           .toList();
     } catch (e) {
       debugPrint('Error getting all students: $e');
@@ -443,6 +483,56 @@ class StudentService {
     }
     return migratedCount;
   }
+  /// Admin: Deletes a student if they have no records, otherwise archives them.
+  static Future<void> deleteOrArchiveStudent(String docId, String studentId) async {
+    // 1. Check for records
+    final attendanceSnap = await FirestoreService.attendance
+        .where('student_id', isEqualTo: studentId)
+        .limit(1)
+        .get();
+        
+    final obligationsSnap = await FirestoreService.db
+        .collection('student_obligations')
+        .where('student_id', isEqualTo: studentId)
+        .limit(1)
+        .get();
+        
+    final paymentsSnap = await FirestoreService.db
+        .collection('payment_records')
+        .where('student_id', isEqualTo: studentId)
+        .limit(1)
+        .get();
+
+    final hasRecords = attendanceSnap.docs.isNotEmpty ||
+        obligationsSnap.docs.isNotEmpty ||
+        paymentsSnap.docs.isNotEmpty;
+
+    if (hasRecords) {
+      // Archive: Mark as archived
+      await FirestoreService.students.doc(docId).update({
+        'is_archived': true,
+        'archived_at': FieldValue.serverTimestamp(),
+      });
+      await ActivityLogService.log(
+        action: 'student_archived',
+        message: 'Archived student $studentId because they have existing records',
+        entityType: 'student',
+        entityId: docId,
+        actorName: 'Admin',
+      );
+    } else {
+      // Hard Delete
+      await FirestoreService.students.doc(docId).delete();
+      await ActivityLogService.log(
+        action: 'student_deleted',
+        message: 'Hard deleted student $studentId (no records found)',
+        entityType: 'student',
+        entityId: docId,
+        actorName: 'Admin',
+      );
+    }
+  }
+
 }
 
 // ---------------------------------------------------------------------------

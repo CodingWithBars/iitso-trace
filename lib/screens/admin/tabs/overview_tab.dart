@@ -455,13 +455,8 @@ class OverviewTab extends ConsumerWidget {
                     child: AdminQuickAction(
                       label: 'Semester Report',
                       icon: Icons.assessment_rounded,
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Generating Comprehensive Report...'),
-                          ),
-                        );
-                        CsvReportService.generateSemesterReport();
+                      onTap: () async {
+                        await CsvReportService.generateSemesterReport();
                       },
                     ),
                   ),

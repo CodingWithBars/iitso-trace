@@ -111,7 +111,11 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  final allDocs = snap.data?.docs ?? [];
+                  final allDocs = snap.data?.docs.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    return data['is_archived'] != true;
+                  }).toList() ?? [];
+                  
                   var filteredDocs = _selectedYear == 'All'
                       ? allDocs
                       : allDocs.where((doc) {
@@ -315,6 +319,15 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                                               ],
                                             ),
                                           ),
+                                          IconButton(
+                                            icon: const Icon(Icons.delete_outline, color: TraceColors.error),
+                                            tooltip: 'Delete Student',
+                                            onPressed: () => _confirmDelete(
+                                              filteredDocs[i].id,
+                                              studentId,
+                                              name,
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ),
@@ -346,6 +359,67 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
       }
     }
     return NetworkImage(url);
+  }
+
+  Future<void> _confirmDelete(String docId, String studentId, String name) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Student?'),
+        content: Text(
+          'Are you sure you want to delete $name ($studentId)?\n\n'
+          'If this student has existing attendance or payment records, they will be Archived instead. Otherwise, they will be permanently deleted.',
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: TraceColors.error,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(
+          child: CircularProgressIndicator(color: TraceColors.gold),
+        ),
+      );
+
+      try {
+        await StudentService.deleteOrArchiveStudent(docId, studentId);
+        if (mounted) {
+          Navigator.pop(context); // close loading
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Student processed successfully.'),
+              backgroundColor: TraceColors.gold,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          Navigator.pop(context); // close loading
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $e'),
+              backgroundColor: TraceColors.error,
+            ),
+          );
+        }
+      }
+    }
   }
 
   void _showRestoreRecordsDialog() {

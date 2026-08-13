@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:io' as io;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:universal_html/html.dart' as html;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 class CsvReportService {
   static String listToCsv(List<List<dynamic>> rows) {
@@ -23,15 +26,26 @@ class CsvReportService {
         .join('\n');
   }
 
-  static void downloadCsv(String csvData, String fileName) {
-    // For Web (Since the app runs heavily on Web)
-    final bytes = utf8.encode(csvData);
-    final blob = html.Blob([bytes]);
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    html.AnchorElement(href: url)
-      ..setAttribute('download', fileName)
-      ..click();
-    html.Url.revokeObjectUrl(url);
+  static Future<void> downloadCsv(String csvData, String fileName) async {
+    if (kIsWeb) {
+      final bytes = utf8.encode(csvData);
+      final blob = html.Blob([bytes]);
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      html.AnchorElement(href: url)
+        ..setAttribute('download', fileName)
+        ..click();
+      html.Url.revokeObjectUrl(url);
+    } else {
+      try {
+        final directory = await getTemporaryDirectory();
+        final path = '${directory.path}/$fileName';
+        final file = io.File(path);
+        await file.writeAsString(csvData);
+        await Share.shareXFiles([XFile(path)], text: 'CSV Report: $fileName');
+      } catch (e) {
+        debugPrint('Error saving CSV: $e');
+      }
+    }
   }
 
   static Future<void> generateFundsCsv(List<QueryDocumentSnapshot> docs) async {
@@ -56,7 +70,7 @@ class CsvReportService {
     }
 
     String csv = listToCsv(rows);
-    downloadCsv(csv, 'Funds_Ledger_Report.csv');
+    await downloadCsv(csv, 'Funds_Ledger_Report.csv');
   }
 
   static Future<void> generateAttendanceCsv(
@@ -83,7 +97,7 @@ class CsvReportService {
     }
 
     String csv = listToCsv(rows);
-    downloadCsv(csv, 'Event_Attendance_Report.csv');
+    await downloadCsv(csv, 'Event_Attendance_Report.csv');
   }
 
   static double _parseTimeStr(String? timeStr) {
@@ -203,7 +217,7 @@ class CsvReportService {
       }
 
       String csv = listToCsv(rows);
-      downloadCsv(csv, 'Semester_Comprehensive_Report.csv');
+      await downloadCsv(csv, 'Semester_Comprehensive_Report.csv');
     } catch (e) {
       debugPrint('Error generating semester report: $e');
     }

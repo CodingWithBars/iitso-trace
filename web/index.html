@@ -1,46 +1,101 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="TRACE — Transparent Records & Attendance for Campus Events">
 
-  <!-- iOS meta tags & icons -->
+  <!-- Mobile & PWA Optimization Meta Tags -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
-  <!-- Web Optimization and PWA tags -->
-  <meta name="theme-color" content="#121212">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="TRACE">
+  <meta name="theme-color" content="#050505">
 
-  <!-- Favicon -->
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>trace</title>
+  <title>TRACE — Campus Attendance & Student Records</title>
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #050505;
+      background-image: linear-gradient(180deg, #050505 0%, #160A04 35%, #3E1505 65%, #8B2500 90%, #FF5722 100%);
+      background-attachment: fixed;
+      overflow: hidden;
+      touch-action: manipulation;
+      overscroll-behavior-y: none;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-user-select: none;
+      user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    #vercel-splash {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 999999;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(180deg, #050505 0%, #160A04 35%, #3E1505 65%, #8B2500 90%, #FF5722 100%);
+      transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
+    }
+
+    #vercel-splash.fade-out {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .splash-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-box {
+      width: clamp(120px, 32vw, 155px);
+      height: clamp(120px, 32vw, 155px);
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(255, 87, 34, 0.35);
+      overflow: hidden;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .splash-gif {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      border-radius: 20px;
+    }
+  </style>
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
+  <!-- Initial HTML Launch Splash Screen (replaces default Vercel loading screen) -->
+  <div id="vercel-splash">
+    <div class="splash-content">
+      <div class="logo-box">
+        <img src="assets/splash-logo.gif" alt="TRACE Logo" class="splash-gif" />
+      </div>
+    </div>
+  </div>
 
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
   <script>
     window.deferredPwaPrompt = null;
     window.isPwaInstalled = false;
@@ -88,6 +143,32 @@
       }
       return false;
     };
+
+    // Smoothly dismiss initial HTML splash screen when Flutter engine renders
+    function dismissVercelSplash() {
+      const splash = document.getElementById('vercel-splash');
+      if (splash && !splash.classList.contains('fade-out')) {
+        splash.classList.add('fade-out');
+        setTimeout(function() {
+          if (splash && splash.parentNode) {
+            splash.parentNode.removeChild(splash);
+          }
+        }, 550);
+      }
+    }
+
+    window.addEventListener('flutter-first-frame', dismissVercelSplash);
+
+    const observer = new MutationObserver(function() {
+      if (document.querySelector('flutter-view') || document.querySelector('flt-glass-pane') || document.querySelector('canvas')) {
+        dismissVercelSplash();
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // Fallback safety dismiss after 6s in case network delay occurs
+    setTimeout(dismissVercelSplash, 6000);
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
