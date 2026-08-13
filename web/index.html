@@ -22,88 +22,113 @@
   <title>TRACE — Campus Attendance & Student Records</title>
 
   <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
     html, body {
       margin: 0;
       padding: 0;
       width: 100%;
       height: 100%;
       background-color: #050505;
-      background-image: linear-gradient(180deg, #050505 0%, #160A04 35%, #3E1505 65%, #8B2500 90%, #FF5722 100%);
-      background-attachment: fixed;
       overflow: hidden;
       touch-action: manipulation;
-      overscroll-behavior-y: none;
+      overscroll-behavior: none;
       -webkit-tap-highlight-color: transparent;
       -webkit-user-select: none;
       user-select: none;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
-    #vercel-splash {
+    /* ── Full-Screen Launch Splash ──────────────────────────────────── */
+    #trace-splash {
       position: fixed;
-      top: 0;
-      left: 0;
+      inset: 0;
       width: 100vw;
       height: 100vh;
+      height: 100dvh;
       z-index: 999999;
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
-      background: linear-gradient(180deg, #050505 0%, #160A04 35%, #3E1505 65%, #8B2500 90%, #FF5722 100%);
-      transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
+      /* Radial glow from bottom center — matches the screenshot exactly */
+      background: radial-gradient(
+        ellipse 100% 80% at 50% 100%,
+        #C44000 0%,
+        #6B1E00 30%,
+        #2A0800 60%,
+        #050505 100%
+      );
+      opacity: 1;
+      visibility: visible;
+      transition:
+        opacity   0.55s cubic-bezier(0.4, 0, 0.2, 1),
+        visibility 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+      /* Respect iOS notch / home indicator */
+      padding-top:    env(safe-area-inset-top,    0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      padding-left:   env(safe-area-inset-left,   0px);
+      padding-right:  env(safe-area-inset-right,  0px);
     }
 
-    #vercel-splash.fade-out {
+    #trace-splash.hidden {
       opacity: 0;
       visibility: hidden;
       pointer-events: none;
     }
 
-    .splash-content {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .logo-box {
-      width: clamp(120px, 32vw, 155px);
-      height: clamp(120px, 32vw, 155px);
-      border-radius: 20px;
-      box-shadow: 0 10px 30px rgba(255, 87, 34, 0.35);
-      overflow: hidden;
-      background: transparent;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .splash-gif {
-      width: 100%;
-      height: 100%;
+    #trace-splash .splash-gif {
+      width:  clamp(140px, 42vmin, 200px);
+      height: clamp(140px, 42vmin, 200px);
       object-fit: contain;
-      border-radius: 20px;
+      border-radius: 24px;
+      box-shadow:
+        0 0 50px  rgba(255, 87, 34, 0.55),
+        0 0 100px rgba(255, 87, 34, 0.25);
+      animation: tracePulse 2.2s ease-in-out infinite;
+    }
+
+    @keyframes tracePulse {
+      0%, 100% {
+        box-shadow: 0 0 50px rgba(255,87,34,0.55), 0 0 100px rgba(255,87,34,0.25);
+      }
+      50% {
+        box-shadow: 0 0 70px rgba(255,87,34,0.80), 0 0 140px rgba(255,87,34,0.40);
+      }
     }
   </style>
 </head>
 <body>
-  <!-- Initial HTML Launch Splash Screen (replaces default Vercel loading screen) -->
-  <div id="vercel-splash">
-    <div class="splash-content">
-      <div class="logo-box">
-        <img src="assets/splash-logo.gif" alt="TRACE Logo" class="splash-gif" />
-      </div>
-    </div>
+
+  <!-- Full-Screen Splash (replaces Vercel/browser default loading screen) -->
+  <div id="trace-splash">
+    <img src="assets/splash-logo.gif"
+         class="splash-gif"
+         alt="TRACE"
+         draggable="false"
+         decoding="async" />
   </div>
 
   <script>
+    // ── PWA State ──────────────────────────────────────────────────────
     window.deferredPwaPrompt = null;
-    window.isPwaInstalled = false;
+    window.isPwaInstalled    = false;
+
+    // ── Platform Detection (called from Dart via JS interop) ───────────
+    window.isIOSDevice = function() {
+      return /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    };
+
+    window.isAndroidDevice = function() {
+      return /android/i.test(navigator.userAgent);
+    };
 
     window.checkIsPwaInstalled = function() {
-      const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
-                          window.navigator.standalone === true ||
-                          document.referrer.includes('android-app://');
+      var isStandalone =
+        (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+        (window.navigator.standalone === true) ||
+        document.referrer.includes('android-app://');
       return isStandalone || window.isPwaInstalled;
     };
 
@@ -111,65 +136,65 @@
       return window.deferredPwaPrompt !== null;
     };
 
+    // ── PWA Install Prompt ─────────────────────────────────────────────
     window.addEventListener('beforeinstallprompt', function(e) {
       e.preventDefault();
       window.deferredPwaPrompt = e;
-      if (window.onPwaInstallable) {
-        window.onPwaInstallable();
-      }
+      if (typeof window.onPwaInstallable === 'function') window.onPwaInstallable();
     });
 
     window.addEventListener('appinstalled', function() {
       window.deferredPwaPrompt = null;
-      window.isPwaInstalled = true;
-      if (window.onPwaInstalled) {
-        window.onPwaInstalled();
-      }
+      window.isPwaInstalled    = true;
+      if (typeof window.onPwaInstalled === 'function') window.onPwaInstalled();
     });
 
     window.triggerPwaInstall = async function() {
       if (window.deferredPwaPrompt) {
         try {
           window.deferredPwaPrompt.prompt();
-          const choiceResult = await window.deferredPwaPrompt.userChoice;
-          if (choiceResult.outcome === 'accepted') {
+          var result = await window.deferredPwaPrompt.userChoice;
+          if (result.outcome === 'accepted') {
             window.deferredPwaPrompt = null;
-            window.isPwaInstalled = true;
+            window.isPwaInstalled    = true;
             return true;
           }
-        } catch (err) {
-          console.log('PWA prompt error:', err);
+        } catch (e) {
+          console.warn('[TRACE PWA]', e);
         }
       }
       return false;
     };
 
-    // Smoothly dismiss initial HTML splash screen when Flutter engine renders
-    function dismissVercelSplash() {
-      const splash = document.getElementById('vercel-splash');
-      if (splash && !splash.classList.contains('fade-out')) {
-        splash.classList.add('fade-out');
-        setTimeout(function() {
-          if (splash && splash.parentNode) {
-            splash.parentNode.removeChild(splash);
-          }
-        }, 550);
-      }
+    // ── Splash Dismissal ───────────────────────────────────────────────
+    var _splashDone = false;
+    function dismissSplash() {
+      if (_splashDone) return;
+      _splashDone = true;
+      var el = document.getElementById('trace-splash');
+      if (!el) return;
+      el.classList.add('hidden');
+      setTimeout(function() { el && el.parentNode && el.parentNode.removeChild(el); }, 700);
     }
 
-    window.addEventListener('flutter-first-frame', dismissVercelSplash);
+    // 1) Flutter's official first-frame event
+    window.addEventListener('flutter-first-frame', dismissSplash);
 
-    const observer = new MutationObserver(function() {
-      if (document.querySelector('flutter-view') || document.querySelector('flt-glass-pane') || document.querySelector('canvas')) {
-        dismissVercelSplash();
-        observer.disconnect();
+    // 2) DOM mutation — catches canvas/glass-pane insertion
+    var _obs = new MutationObserver(function() {
+      if (document.querySelector('flt-glass-pane') ||
+          document.querySelector('flutter-view')   ||
+          document.querySelector('canvas')) {
+        dismissSplash();
+        _obs.disconnect();
       }
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    _obs.observe(document.body, { childList: true, subtree: true });
 
-    // Fallback safety dismiss after 6s in case network delay occurs
-    setTimeout(dismissVercelSplash, 6000);
+    // 3) Hard safety timeout (8 s)
+    setTimeout(dismissSplash, 8000);
   </script>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

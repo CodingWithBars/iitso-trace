@@ -49,9 +49,13 @@ final routerProvider = Provider<GoRouter>((ref) {
   final authNotifier = _AuthChangeNotifier(ref);
 
   return GoRouter(
-    initialLocation: '/splash',
+    // On web the HTML splash already shows during Flutter initialisation,
+    // so skip the in-app /splash route and go directly to '/'.
+    initialLocation: kIsWeb ? '/' : '/splash',
     refreshListenable: authNotifier,
     redirect: (BuildContext context, GoRouterState state) {
+      // Skip Flutter splash entirely on web
+      if (kIsWeb && state.uri.path == '/splash') return '/';
       if (state.uri.path == '/splash') return null;
 
       // Use the stream value — reactive to signOut()
