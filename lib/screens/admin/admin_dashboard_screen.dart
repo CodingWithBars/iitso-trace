@@ -1397,7 +1397,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
 
     Widget buildPage(String title, String value, Color color, String subtitle) {
       return TraceCard(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1441,7 +1441,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     }
 
     return SizedBox(
-      height: 190,
+      height: 145,
       child: PageView(
         controller: PageController(viewportFraction: 0.95),
         children: [

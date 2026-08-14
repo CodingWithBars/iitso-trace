@@ -113,12 +113,27 @@ class _WebStudentIdScreenState extends ConsumerState<WebStudentIdScreen> {
             ),
           ],
         ),
-        body: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        body: SafeArea(
+          child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 520),
-              child: Column(children: [_buildIdCard(), _buildNoteWidget()]),
+              child: CustomScrollView(
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                    sliver: SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(child: _buildIdCard()),
+                          _buildNoteWidget(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -189,13 +204,17 @@ class _WebStudentIdScreenState extends ConsumerState<WebStudentIdScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               const Divider(color: TraceColors.lightGrey),
-              const SizedBox(height: 24),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final qrSize = (constraints.maxWidth - 48).clamp(160.0, 288.0);
-                  return Container(
+              const Spacer(flex: 1),
+              Expanded(
+                flex: 4,
+                child: Center(
+                  child: Container(
+                    constraints: const BoxConstraints(
+                      maxWidth: 288,
+                      maxHeight: 288,
+                    ),
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -205,23 +224,25 @@ class _WebStudentIdScreenState extends ConsumerState<WebStudentIdScreen> {
                         width: 1.5,
                       ),
                     ),
-                    child: QrImageView(
-                      data: _student!.qrHash,
-                      version: QrVersions.auto,
-                      size: qrSize,
-                      eyeStyle: const QrEyeStyle(
-                        eyeShape: QrEyeShape.square,
-                        color: TraceColors.navyBlue,
-                      ),
-                      dataModuleStyle: const QrDataModuleStyle(
-                        dataModuleShape: QrDataModuleShape.circle,
-                        color: TraceColors.navyBlue,
+                    child: AspectRatio(
+                      aspectRatio: 1.0,
+                      child: QrImageView(
+                        data: _student!.qrHash,
+                        version: QrVersions.auto,
+                        eyeStyle: const QrEyeStyle(
+                          eyeShape: QrEyeShape.square,
+                          color: TraceColors.navyBlue,
+                        ),
+                        dataModuleStyle: const QrDataModuleStyle(
+                          dataModuleShape: QrDataModuleShape.circle,
+                          color: TraceColors.navyBlue,
+                        ),
                       ),
                     ),
-                  );
-                },
+                  ),
+                ),
               ),
-              const SizedBox(height: 16),
+              const Spacer(flex: 1),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -241,9 +262,9 @@ class _WebStudentIdScreenState extends ConsumerState<WebStudentIdScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               const Divider(color: TraceColors.lightGrey),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               GoldButton(
                 label: 'View Attendance Summary',
                 icon: Icons.analytics_outlined,
