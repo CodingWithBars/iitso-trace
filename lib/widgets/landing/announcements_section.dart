@@ -3,7 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
 
+import 'package:go_router/go_router.dart';
 import '../../theme/app_theme.dart';
+import '../../models/announcement.dart';
 import '../../services/auth_service.dart';
 import '../shared_widgets.dart';
 
@@ -190,7 +192,7 @@ class _AnnouncementsSectionState extends State<AnnouncementsSection> {
                         child: SizedBox(
                           width: 320,
                           child: GestureDetector(
-                            onTap: () => _showAnnouncementDetails(data),
+                            onTap: () => _showAnnouncementDetails(doc),
                             child: TraceCard(
                               padding: const EdgeInsets.all(20),
                               child: Row(
@@ -308,108 +310,10 @@ class _AnnouncementsSectionState extends State<AnnouncementsSection> {
     );
   }
 
-  void _showAnnouncementDetails(Map<String, dynamic> data) {
-    showDialog(
-      context: context,
-      builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: TraceColors.navyBlue,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (data['banner_url'] != null &&
-                  data['banner_url'].toString().isNotEmpty)
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(20),
-                  ),
-                  child: Container(
-                    constraints: const BoxConstraints(maxHeight: 300),
-                    width: double.infinity,
-                    child: _buildBannerImage(
-                      data['banner_url'],
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ),
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      data['title'] ?? 'Announcement',
-                      style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 22,
-                        color: TraceColors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (data['date_posted'] != null)
-                      Text(
-                        _formatDate(
-                          (data['date_posted'] as Timestamp).toDate(),
-                        ),
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: TraceColors.gold,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    if (data['scheduled_date'] != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          'Scheduled: ${_formatDate((data['scheduled_date'] as Timestamp).toDate())}',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: TraceColors.white.withValues(alpha: 0.5),
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 20),
-                    Text(
-                      data['content'] ?? '',
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        color: TraceColors.white.withValues(alpha: 0.9),
-                        height: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: TraceColors.gold,
-                          foregroundColor: TraceColors.navyBlue,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        onPressed: () => Navigator.pop(ctx),
-                        child: Text(
-                          'Close',
-                          style: GoogleFonts.inter(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  void _showAnnouncementDetails(QueryDocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final announcement = Announcement.fromMap(data, doc.id);
+    context.push('/announcement-details', extra: announcement);
   }
 
   String _formatDate(DateTime dt) {

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import '../../../theme/app_theme.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/activity_log_service.dart';
+import '../../../models/announcement.dart';
 
 class AnnouncementsTab extends StatefulWidget {
   final void Function({QueryDocumentSnapshot? doc}) onShowAnnouncementDialog;
@@ -209,10 +211,15 @@ class _AnnouncementsTabState extends State<AnnouncementsTab> {
                     final schedDt = (data['scheduled_date'] as Timestamp?)
                         ?.toDate();
 
-                    return Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
+                    return GestureDetector(
+                      onTap: () {
+                        final announcement = Announcement.fromMap(data, doc.id);
+                        context.push('/announcement-details', extra: announcement);
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: catColor.withValues(alpha: 0.3),
                           width: 1.5,
@@ -353,8 +360,9 @@ class _AnnouncementsTabState extends State<AnnouncementsTab> {
                           ),
                         ],
                       ),
-                    );
-                  },
+                    ),
+                  );
+                },
                 );
               },
             ),

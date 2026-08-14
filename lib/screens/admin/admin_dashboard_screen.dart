@@ -23,6 +23,7 @@ import 'tabs/overview_tab.dart';
 import 'tabs/events_tab.dart';
 import '../event_details_full_screen.dart';
 import 'tabs/announcements_tab.dart';
+import '../../models/announcement.dart';
 import 'attendance_events_screen.dart';
 import '../../models/student.dart';
 import 'student_financial_profile_screen.dart';
@@ -689,186 +690,13 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   }
 
   void _showAnnouncementDialog({QueryDocumentSnapshot? doc}) {
-    final data = doc?.data() as Map<String, dynamic>?;
-    final titleCtrl = TextEditingController(text: data?['title'] ?? '');
-    final contentCtrl = TextEditingController(text: data?['content'] ?? '');
-    String category = data?['category'] ?? 'Upcoming';
-    String coverImageBase64 = data?['banner_url'] ?? '';
-    DateTime? scheduledDate = data?['scheduled_date'] != null
-        ? (data!['scheduled_date'] as Timestamp).toDate()
-        : null;
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDState) => AlertDialog(
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 24,
-          ),
-          title: Text(
-            doc == null ? 'Post Announcement' : 'Edit Announcement',
-            style: GoogleFonts.inter(
-              fontWeight: FontWeight.w700,
-              color: TraceColors.navyBlue,
-            ),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                GestureDetector(
-                  onTap: () async {
-                    final picker = ImagePicker();
-                    final picked = await picker.pickImage(
-                      source: ImageSource.gallery,
-                      maxWidth: 800,
-                      imageQuality: 80,
-                    );
-                    if (picked != null) {
-                      final bytes = await picked.readAsBytes();
-                      final b64 = base64Encode(bytes);
-                      setDState(
-                        () => coverImageBase64 = 'data:image/jpeg;base64,$b64',
-                      );
-                    }
-                  },
-                  child: Container(
-                    height: 120,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: TraceColors.lightGrey.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: TraceColors.gold.withValues(alpha: 0.5),
-                      ),
-                      image: coverImageBase64.isNotEmpty
-                          ? DecorationImage(
-                              image: coverImageBase64.startsWith('data:image')
-                                  ? MemoryImage(
-                                          base64Decode(
-                                            coverImageBase64.split(',').last,
-                                          ),
-                                        )
-                                        as ImageProvider
-                                  : NetworkImage(coverImageBase64),
-                              fit: BoxFit.cover,
-                            )
-                          : null,
-                    ),
-                    child: coverImageBase64.isEmpty
-                        ? Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.add_photo_alternate_rounded,
-                                color: TraceColors.gold,
-                                size: 32,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Upload Cover Image',
-                                style: GoogleFonts.inter(
-                                  color: TraceColors.navyBlue,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          )
-                        : null,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: titleCtrl,
-                  decoration: const InputDecoration(labelText: 'Title'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: contentCtrl,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Content'),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: category,
-                  decoration: const InputDecoration(labelText: 'Category'),
-                  items: ['Upcoming', 'Ongoing', 'Previous', 'Cancelled']
-                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                      .toList(),
-                  onChanged: (v) => setDState(() => category = v ?? category),
-                ),
-                const SizedBox(height: 12),
-                ListTile(
-                  title: const Text(
-                    'Scheduled Date (Optional)',
-                    style: TextStyle(fontSize: 14),
-                  ),
-                  subtitle: Text(
-                    scheduledDate == null
-                        ? 'Not set'
-                        : DateFormat('MM/dd/yyyy').format(scheduledDate!),
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  trailing: const Icon(Icons.calendar_today, size: 20),
-                  onTap: () async {
-                    final d = await showDatePicker(
-                      context: ctx,
-                      initialDate: scheduledDate ?? DateTime.now(),
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2030),
-                    );
-                    if (d != null) setDState(() => scheduledDate = d);
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            GoldButton(
-              label: doc == null ? 'Post' : 'Save',
-              onPressed: () async {
-                if (titleCtrl.text.trim().isEmpty) return;
-                final payload = {
-                  'title': titleCtrl.text,
-                  'content': contentCtrl.text,
-                  'category': category,
-                  'scheduled_date': scheduledDate,
-                  'banner_url': coverImageBase64,
-                };
-                if (doc == null) {
-                  payload['date_posted'] = FieldValue.serverTimestamp();
-                  final docRef = await FirestoreService.db
-                      .collection('announcements')
-                      .add(payload);
-                  await ActivityLogService.log(
-                    action: 'announcement_posted',
-                    message: 'Posted new announcement: "${titleCtrl.text}"',
-                    entityType: 'announcement',
-                    entityId: docRef.id,
-                    actorName: 'Admin',
-                  );
-                } else {
-                  await doc.reference.update(payload);
-                  await ActivityLogService.log(
-                    action: 'announcement_updated',
-                    message: 'Updated announcement: "${titleCtrl.text}"',
-                    entityType: 'announcement',
-                    entityId: doc.id,
-                    actorName: 'Admin',
-                  );
-                }
-                if (!ctx.mounted) return;
-                Navigator.pop(ctx);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
+    if (doc == null) {
+      context.push('/admin/announcement-form');
+    } else {
+      final data = doc.data() as Map<String, dynamic>;
+      final announcement = Announcement.fromMap(data, doc.id);
+      context.push('/admin/announcement-form', extra: announcement);
+    }
   }
 
   Widget _buildFundsTab() {

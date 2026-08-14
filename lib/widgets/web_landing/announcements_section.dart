@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:go_router/go_router.dart';
 import '../../theme/app_theme.dart';
+import '../../models/announcement.dart';
 import 'web_landing_helpers.dart';
 
 class AnnouncementsSection extends StatefulWidget {
@@ -128,12 +130,11 @@ class _AnnouncementsSectionState extends State<AnnouncementsSection> {
                         spacing: 20,
                         runSpacing: 20,
                         children: filtered.map((doc) {
-                          final data = doc.data() as Map<String, dynamic>;
                           return SizedBox(
                             width: constraints.maxWidth > 1200
                                 ? (constraints.maxWidth - hPad * 2 - 40) / 3
                                 : (constraints.maxWidth - hPad * 2 - 20) / 2,
-                            child: _announcementCard(data),
+                            child: _announcementCard(doc),
                           );
                         }).toList(),
                       ),
@@ -144,10 +145,9 @@ class _AnnouncementsSectionState extends State<AnnouncementsSection> {
                     padding: EdgeInsets.symmetric(horizontal: hPad),
                     child: Column(
                       children: filtered.map((doc) {
-                        final data = doc.data() as Map<String, dynamic>;
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 16),
-                          child: _announcementCard(data),
+                          child: _announcementCard(doc),
                         );
                       }).toList(),
                     ),
@@ -161,14 +161,20 @@ class _AnnouncementsSectionState extends State<AnnouncementsSection> {
     );
   }
 
-  Widget _announcementCard(Map<String, dynamic> data) {
+  Widget _announcementCard(QueryDocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
     final date = data['date_posted'] != null
         ? formatDate((data['date_posted'] as Timestamp).toDate())
         : '';
     final bannerUrl = data['banner_url']?.toString() ?? '';
 
-    return Container(
-      decoration: BoxDecoration(
+    return GestureDetector(
+      onTap: () {
+        final announcement = Announcement.fromMap(data, doc.id);
+        context.push('/announcement-details', extra: announcement);
+      },
+      child: Container(
+        decoration: BoxDecoration(
         color: TraceColors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: TraceColors.lightGrey.withValues(alpha: 0.6)),
@@ -258,6 +264,7 @@ class _AnnouncementsSectionState extends State<AnnouncementsSection> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

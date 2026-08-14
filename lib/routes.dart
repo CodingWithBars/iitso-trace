@@ -37,6 +37,12 @@ import 'screens/web/web_admin_login_screen.dart';
 import 'screens/web/web_registration_screen.dart';
 import 'screens/web/web_student_id_screen.dart';
 import 'screens/web/web_student_summary_screen.dart';
+
+
+import 'screens/admin/announcement_form_screen.dart';
+import 'screens/announcement_details_screen.dart';
+import 'models/announcement.dart';
+
 import 'screens/web/web_admin_dashboard_screen.dart';
 import 'screens/web/web_scanner_screen.dart';
 
@@ -226,6 +232,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => EventFormScreen(
           event: state.extra as Event?,
         ),
+      ),
+      GoRoute(
+        path: '/admin/announcement-form',
+        builder: (context, state) {
+          final announcement = state.extra as Announcement?;
+          return AnnouncementFormScreen(announcement: announcement);
+        },
+      ),
+      GoRoute(
+        path: '/announcement-details',
+        builder: (context, state) {
+          final announcement = state.extra as Announcement;
+          return AnnouncementDetailsScreen(announcement: announcement);
+        },
       ),
       GoRoute(
         path: '/admin/logs',

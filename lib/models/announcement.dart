@@ -5,6 +5,9 @@ class Announcement {
   final String category;
   final DateTime datePosted;
   final DateTime? scheduledDate;
+  final String bannerUrl;
+  final List<String> likedBy;
+  final int commentCount;
 
   Announcement({
     required this.id,
@@ -13,6 +16,9 @@ class Announcement {
     required this.category,
     required this.datePosted,
     this.scheduledDate,
+    this.bannerUrl = '',
+    this.likedBy = const [],
+    this.commentCount = 0,
   });
 
   factory Announcement.fromMap(Map<String, dynamic> data, String documentId) {
@@ -27,6 +33,9 @@ class Announcement {
       scheduledDate: data['scheduled_date'] != null
           ? (data['scheduled_date'] as dynamic).toDate()
           : null,
+      bannerUrl: data['banner_url'] ?? '',
+      likedBy: List<String>.from(data['liked_by'] ?? []),
+      commentCount: data['comment_count'] ?? 0,
     );
   }
 
@@ -37,6 +46,9 @@ class Announcement {
       'category': category,
       'date_posted': datePosted,
       'scheduled_date': scheduledDate,
+      'banner_url': bannerUrl,
+      'liked_by': likedBy,
+      'comment_count': commentCount,
     };
   }
 }
