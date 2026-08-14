@@ -254,10 +254,13 @@ class _AttendanceCount extends StatelessWidget {
           );
         }
 
-        final attendedCount = snapshot.data!.docs
-            .map((d) => (d.data() as Map<String, dynamic>)['student_id'])
-            .toSet()
-            .length;
+        final attendedCount = snapshot.data!.docs.where((d) {
+          final data = d.data() as Map<String, dynamic>;
+          final status = (data['final_status'] as String? ?? '').toLowerCase();
+          return status != 'absent' && status != 'excused';
+        }).map((d) {
+          return (d.data() as Map<String, dynamic>)['student_id'];
+        }).toSet().length;
 
         return Text(
           'Attended: $attendedCount',

@@ -12,7 +12,6 @@ import '../../services/financial_service.dart';
 import '../../services/student_service.dart';
 import '../../services/event_service.dart';
 import '../../services/auth_service.dart';
-import 'payment_scanner_modal.dart';
 import 'student_obligations_list_screen.dart';
 import 'org_cashflow_logs_screen.dart';
 import 'record_manual_payment_screen.dart';
@@ -218,24 +217,21 @@ class _FinancialDashboardScreenState
   }
 
   Widget _buildActionToolbar() {
+    final role = ref.watch(adminRoleProvider).value;
+    final isAuditor = role == 'auditor';
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth > 540;
 
         final items = [
-          _actionCard(
-            title: 'Scan Payment QR',
-            subtitle: 'Scan student receipt QR',
-            icon: Icons.qr_code_scanner_rounded,
-            color: TraceColors.success,
-            onTap: _showScannerModal,
-          ),
-          _actionCard(
-            title: 'Record Cash / GCash',
-            subtitle: 'Manual payment collection',
-            icon: Icons.point_of_sale_rounded,
-            color: TraceColors.navyBlue,
-            onTap: () async {
+          if (!isAuditor)
+            _actionCard(
+              title: 'Record Cash / GCash',
+              subtitle: 'Manual payment collection',
+              icon: Icons.point_of_sale_rounded,
+              color: TraceColors.navyBlue,
+              onTap: () async {
               final res = await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const RecordManualPaymentScreen()),
@@ -265,27 +261,30 @@ class _FinancialDashboardScreenState
               MaterialPageRoute(builder: (_) => const OrgCashflowLogsScreen()),
             ),
           ),
-          _actionCard(
-            title: 'Issue Fee / Dues',
-            subtitle: 'Batch dues to all students',
-            icon: Icons.add_card_rounded,
-            color: TraceColors.navyBlue,
-            onTap: _showCreateDuesDialog,
-          ),
-          _actionCard(
-            title: 'Auto-Sanction Fines',
-            subtitle: 'Post fines for missed events',
-            icon: Icons.gavel_rounded,
-            color: TraceColors.error,
-            onTap: _showAutoSanctionDialog,
-          ),
-          _actionCard(
-            title: 'Log Org Expense',
-            subtitle: 'Record treasury expenditure',
-            icon: Icons.payments_outlined,
-            color: TraceColors.royalBlue,
-            onTap: _showLogExpenseDialog,
-          ),
+          if (!isAuditor)
+            _actionCard(
+              title: 'Issue Fee / Dues',
+              subtitle: 'Batch dues to all students',
+              icon: Icons.add_card_rounded,
+              color: TraceColors.navyBlue,
+              onTap: _showCreateDuesDialog,
+            ),
+          if (!isAuditor)
+            _actionCard(
+              title: 'Auto-Sanction Fines',
+              subtitle: 'Post fines for missed events',
+              icon: Icons.gavel_rounded,
+              color: TraceColors.error,
+              onTap: _showAutoSanctionDialog,
+            ),
+          if (!isAuditor)
+            _actionCard(
+              title: 'Log Org Expense',
+              subtitle: 'Record treasury expenditure',
+              icon: Icons.payments_outlined,
+              color: TraceColors.royalBlue,
+              onTap: _showLogExpenseDialog,
+            ),
         ];
 
         if (isWide) {
@@ -369,15 +368,6 @@ class _FinancialDashboardScreenState
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _showScannerModal() {
-    showDialog(
-      context: context,
-      builder: (ctx) => PaymentScannerModal(
-        onPaymentProcessed: _loadData,
       ),
     );
   }

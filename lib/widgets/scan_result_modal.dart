@@ -411,6 +411,15 @@ class _ScanResultModalState extends State<ScanResultModal>
           label: '✕ NO ACTIVE EVENT',
           buttonTextColor: TraceColors.white,
         );
+      case ScanResultStatus.wrongPhase:
+        return _ModalConfig(
+          icon: Icons.block_rounded,
+          iconColor: TraceColors.error,
+          iconBg: TraceColors.errorLight,
+          borderColor: TraceColors.error,
+          label: '✕ WRONG SCAN PHASE',
+          buttonTextColor: TraceColors.white,
+        );
       case ScanResultStatus.error:
         return _ModalConfig(
           icon: Icons.error_outline_rounded,

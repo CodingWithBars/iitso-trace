@@ -41,7 +41,9 @@ class CsvReportService {
         final path = '${directory.path}/$fileName';
         final file = io.File(path);
         await file.writeAsString(csvData);
-        await Share.shareXFiles([XFile(path)], text: 'CSV Report: $fileName');
+        await SharePlus.instance.share(
+          ShareParams(files: [XFile(path)], text: 'CSV Report: $fileName'),
+        );
       } catch (e) {
         debugPrint('Error saving CSV: $e');
       }
@@ -74,30 +76,51 @@ class CsvReportService {
   }
 
   static Future<void> generateAttendanceCsv(
-    List<dynamic> attendanceList,
-    Map<String, dynamic> studentsMap,
+    String eventName,
+    List<dynamic> filteredData,
+    String computedEventStatus,
   ) async {
     List<List<dynamic>> rows = [];
 
     // Header row
-    rows.add(['Time In', 'Student Name', 'Program', 'Year Level', 'Status']);
+    rows.add([
+      'Student ID', 
+      'Student Name', 
+      'Year Level', 
+      'Status', 
+      'Time In (AM)', 
+      'Time Out (AM)', 
+      'Time In (PM)', 
+      'Time Out (PM)'
+    ]);
 
-    final dateFormat = DateFormat('MM/dd/yyyy hh:mm a');
+    final timeFormat = DateFormat('hh:mm a');
 
-    for (var att in attendanceList) {
-      final timeStr = dateFormat.format(att.timestamp);
-      final studentData =
-          studentsMap[att.studentId] as Map<String, dynamic>? ?? {};
+    for (var item in filteredData) {
+      final studentData = item.studentData;
+      final att = item.attendance;
+      
+      final schoolId = studentData['student_id'] ?? 'N/A';
       final name = studentData['name'] ?? 'Unknown';
-      final program = studentData['course'] ?? '';
-      final year = studentData['year_level'] ?? '';
-      final status = att.status;
+      final year = studentData['year_level'] ?? 'N/A';
+      
+      final isAbsent = att == null;
+      final status = isAbsent 
+          ? (computedEventStatus == 'upcoming' ? 'PENDING' : 'ABSENT')
+          : (att.finalStatus.toUpperCase());
+          
+      final timeInAm = (att != null && att.timeInAm != null) ? timeFormat.format(att.timeInAm!) : '--';
+      final timeOutAm = (att != null && att.timeOutAm != null) ? timeFormat.format(att.timeOutAm!) : '--';
+      final timeInPm = (att != null && att.timeInPm != null) ? timeFormat.format(att.timeInPm!) : '--';
+      final timeOutPm = (att != null && att.timeOutPm != null) ? timeFormat.format(att.timeOutPm!) : '--';
 
-      rows.add([timeStr, name, program, year, status]);
+      rows.add([schoolId, name, year, status, timeInAm, timeOutAm, timeInPm, timeOutPm]);
     }
 
     String csv = listToCsv(rows);
-    await downloadCsv(csv, 'Event_Attendance_Report.csv');
+    final safeEventName = eventName.replaceAll(RegExp(r'[^a-zA-Z0-9_\-\s]'), '').trim().replaceAll(' ', '_');
+    final filename = '${safeEventName}_Attendance_Report.csv';
+    await downloadCsv(csv, filename);
   }
 
   static double _parseTimeStr(String? timeStr) {

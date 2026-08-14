@@ -44,6 +44,7 @@ enum ScanResultStatus {
   attendanceComplete,
   studentNotFound,
   eventNotActive,
+  wrongPhase,
   error,
 }
 
@@ -68,6 +69,100 @@ class ScanResult {
 }
 
 class AttendanceService {
+  /// Normalise a stored time string to DateTime on the given baseDate.
+  /// Handles both "HH:mm" (24-hr) and "h:mm a" / "hh:mm a" (12-hr AM/PM).
+  static DateTime? parseTimeFlexible(String? timeStr, DateTime baseDate) {
+    if (timeStr == null || timeStr.trim().isEmpty) return null;
+    final s = timeStr.trim();
+
+    // Try 24-hr format first: "HH:mm"
+    final colon = s.indexOf(':');
+    if (colon > 0 && !s.contains(' ')) {
+      try {
+        final hour = int.parse(s.substring(0, colon));
+        final minute = int.parse(s.substring(colon + 1));
+        if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
+          return DateTime(
+            baseDate.year,
+            baseDate.month,
+            baseDate.day,
+            hour,
+            minute,
+          );
+        }
+      } catch (_) {}
+    }
+
+    // Try 12-hr format: "h:mm a" or "hh:mm a"
+    try {
+      final parts = s.split(' ');
+      if (parts.length >= 2) {
+        final timeParts = parts[0].split(':');
+        var hour = int.parse(timeParts[0]);
+        final minute = int.parse(timeParts[1]);
+        final isPm = parts[1].toUpperCase() == 'PM';
+        if (hour == 12) {
+          hour = isPm ? 12 : 0;
+        } else if (isPm) {
+          hour += 12;
+        }
+        return DateTime(
+          baseDate.year,
+          baseDate.month,
+          baseDate.day,
+          hour,
+          minute,
+        );
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  /// Returns true if the scan at [now] is late relative to the scheduled time.
+  /// Grace period: 15 minutes after the scheduled time-in.
+  static bool isLateForPhase(ScanPhase phase, DateTime now, Event event) {
+    // If the admin manually closed time-in, all subsequent time-in scans are late.
+    if (event.timeInClosed &&
+        (phase == ScanPhase.timeInAm || phase == ScanPhase.timeInPm)) {
+      return true;
+    }
+    // Explicit cut-off time set
+    if (event.cutOffTime != null &&
+        now.isAfter(event.cutOffTime!) &&
+        (phase == ScanPhase.timeInAm || phase == ScanPhase.timeInPm)) {
+      return true;
+    }
+
+    // Check scheduled time with 15-min grace period
+    if (phase == ScanPhase.timeInAm && event.morningTimeIn != null) {
+      final scheduled = parseTimeFlexible(event.morningTimeIn, event.date);
+      if (scheduled != null &&
+          now.isAfter(scheduled.add(const Duration(minutes: 15)))) {
+        return true;
+      }
+    } else if (phase == ScanPhase.timeInPm && event.afternoonTimeIn != null) {
+      final scheduled = parseTimeFlexible(event.afternoonTimeIn, event.date);
+      if (scheduled != null &&
+          now.isAfter(scheduled.add(const Duration(minutes: 15)))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Validates whether the given phase is applicable for the event type.
+  static bool isPhaseValidForEvent(ScanPhase phase, Event event) {
+    switch (phase) {
+      case ScanPhase.timeInAm:
+      case ScanPhase.timeOutAm:
+        return event.isWholeDay || event.isAmOnly;
+      case ScanPhase.timeInPm:
+      case ScanPhase.timeOutPm:
+        return event.isWholeDay || event.isPmOnly;
+    }
+  }
+
   static Future<ScanResult> processScan({
     required String qrHash,
     required Event event,
@@ -81,10 +176,18 @@ class AttendanceService {
       Map<String, dynamic>? attendanceData;
       String? attendanceDocId;
 
+      // --- Phase validation ---
+      if (!isPhaseValidForEvent(phase, event)) {
+        return ScanResult(
+          status: ScanResultStatus.wrongPhase,
+          message:
+              'This scan phase (${phase.label}) is not applicable for this event.',
+        );
+      }
+
       if (isOfflineMode && offlineStudents != null) {
-        final matches = offlineStudents
-            .where((s) => s.qrHash == qrHash)
-            .toList();
+        final matches =
+            offlineStudents.where((s) => s.qrHash == qrHash).toList();
         if (matches.isEmpty) {
           return ScanResult(status: ScanResultStatus.studentNotFound);
         }
@@ -116,10 +219,15 @@ class AttendanceService {
           studentSnap.docs.first.id,
         );
 
+        // Skip archived students
+        if (student.isArchived) {
+          return ScanResult(status: ScanResultStatus.studentNotFound);
+        }
+
         // 2. Get or create attendance record
         final attendanceSnap = await FirestoreService.attendance
             .where('event_id', isEqualTo: event.id)
-            .where('student_id', isEqualTo: student.id)
+            .where('student_id', isEqualTo: student.studentId)
             .limit(1)
             .get();
 
@@ -131,12 +239,10 @@ class AttendanceService {
       }
 
       final now = DateTime.now();
-      final isLate =
-          event.timeInClosed ||
-          (event.cutOffTime != null && now.isAfter(event.cutOffTime!));
+      final isLate = isLateForPhase(phase, now, event);
 
       if (attendanceData == null) {
-        // First scan — create record
+        // First scan — validate phase makes sense
         if (phase == ScanPhase.timeOutAm) {
           return ScanResult(
             status: ScanResultStatus.error,
@@ -156,11 +262,11 @@ class AttendanceService {
 
         final newData = {
           'event_id': event.id,
-          'student_id': student.id,
+          'student_id': student.studentId,
           'student_name': student.name,
           'event_name': event.eventName,
           phase.field: Timestamp.fromDate(now),
-          'final_status': _computeStatus(phase, now, event),
+          'final_status': isLate ? 'Late' : 'Incomplete',
           'created_at': FieldValue.serverTimestamp(),
           'is_offline_scan': isOfflineMode,
         };
@@ -196,6 +302,7 @@ class AttendanceService {
         );
       }
 
+      // Already has a record for this phase
       if (attendanceData[phase.field] != null) {
         return ScanResult(
           status: (phase == ScanPhase.timeInAm || phase == ScanPhase.timeInPm)
@@ -209,17 +316,21 @@ class AttendanceService {
         );
       }
 
-      // Check if all required slots complete
+      // Check if all required slots are now complete
       final updatedData = {
         ...attendanceData,
         phase.field: Timestamp.fromDate(now),
       };
-      final finalStatus = _computeStatusFromData(
-        updatedData,
-        phase,
-        now,
-        event,
-      );
+
+      // Preserve any existing late status, merge with new late detection
+      final previouslyLate = (attendanceData['final_status'] as String?) == 'Late';
+      final nowLate = previouslyLate || (isLate && (phase == ScanPhase.timeInAm || phase == ScanPhase.timeInPm));
+
+      final isComplete = _isAttendanceComplete(updatedData, event);
+      final finalStatus = isComplete
+          ? (nowLate ? 'Late' : 'Present')
+          : (nowLate ? 'Late' : 'Incomplete');
+
       updatedData['final_status'] = finalStatus;
 
       final updateFields = {
@@ -248,8 +359,6 @@ class AttendanceService {
           actorName: 'Scanner',
         );
       }
-
-      final isComplete = _isAttendanceComplete(updatedData, event);
 
       return ScanResult(
         status: isComplete
@@ -285,12 +394,12 @@ class AttendanceService {
           offlineAttendance.containsKey(attendanceDocId)) {
         final data = offlineAttendance[attendanceDocId]!;
         data.remove(phase.field);
-        data['final_status'] = _computeStatusFromData(
-          data,
-          phase,
-          DateTime.now(),
-          event,
-        );
+        // Recompute status
+        final wasLate = (data['final_status'] as String?) == 'Late';
+        final isComplete = _isAttendanceComplete(data, event);
+        data['final_status'] = isComplete
+            ? (wasLate ? 'Late' : 'Present')
+            : (wasLate ? 'Late' : 'Incomplete');
         FirestoreService.attendance.doc(attendanceDocId).update({
           phase.field: FieldValue.delete(),
           'final_status': data['final_status'],
@@ -303,14 +412,15 @@ class AttendanceService {
     final docSnap = await docRef.get();
     if (!docSnap.exists) return;
 
-    final data = docSnap.data() as Map<String, dynamic>;
-    data.remove(phase.field);
-    final finalStatus = _computeStatusFromData(
-      data,
-      phase,
-      DateTime.now(),
-      event,
+    final data = Map<String, dynamic>.from(
+      docSnap.data() as Map<String, dynamic>,
     );
+    data.remove(phase.field);
+    final wasLate = (data['final_status'] as String?) == 'Late';
+    final isComplete = _isAttendanceComplete(data, event);
+    final finalStatus = isComplete
+        ? (wasLate ? 'Late' : 'Present')
+        : (wasLate ? 'Late' : 'Incomplete');
 
     await docRef.update({
       phase.field: FieldValue.delete(),
@@ -324,24 +434,6 @@ class AttendanceService {
       entityId: attendanceDocId,
       actorName: 'Scanner',
     );
-  }
-
-  static String _computeStatus(ScanPhase phase, DateTime now, Event event) {
-    if (event.timeInClosed ||
-        (event.cutOffTime != null && now.isAfter(event.cutOffTime!))) {
-      return 'Late';
-    }
-    return 'Incomplete';
-  }
-
-  static String _computeStatusFromData(
-    Map<String, dynamic> data,
-    ScanPhase phase,
-    DateTime now,
-    Event event,
-  ) {
-    if (_isAttendanceComplete(data, event)) return 'Present';
-    return 'Incomplete';
   }
 
   static bool _isAttendanceComplete(Map<String, dynamic> data, Event event) {

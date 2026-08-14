@@ -77,6 +77,19 @@ class _StudentObligationsListScreenState
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: TraceColors.gold,
+        onPressed: _showMembershipFeeDialog,
+        icon: const Icon(Icons.badge_rounded, color: TraceColors.navyBlue),
+        label: Text(
+          'Assign Membership Fee',
+          style: GoogleFonts.inter(
+            color: TraceColors.navyBlue,
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
+        ),
+      ),
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: TraceColors.navyBlue),
@@ -297,6 +310,16 @@ class _StudentObligationsListScreenState
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                if (!item.isFullyPaid && item.status != 'non-monetary')
+                  TextButton.icon(
+                    style: TextButton.styleFrom(foregroundColor: TraceColors.success),
+                    onPressed: () async {
+                      await FinancialService.markObligationSettled(item.id);
+                      _loadData();
+                    },
+                    icon: const Icon(Icons.check_circle_outline, size: 16),
+                    label: const Text('Mark Settled', style: TextStyle(fontSize: 12)),
+                  ),
                 IconButton(
                   icon: const Icon(Icons.delete_outline, color: TraceColors.error, size: 20),
                   onPressed: () => _confirmDelete(item),
@@ -330,6 +353,79 @@ class _StudentObligationsListScreenState
               _loadData();
             },
             child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMembershipFeeDialog() {
+    final amountCtrl = TextEditingController();
+    final semesterCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          'Assign Org Membership Fee',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: TraceColors.navyBlue),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'This will create a membership fee obligation for all registered students who do not yet have this fee.',
+              style: GoogleFonts.inter(fontSize: 12, color: TraceColors.medGrey),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: semesterCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Semester / Period',
+                hintText: 'e.g. 1st Semester AY 2024-2025',
+                prefixIcon: Icon(Icons.calendar_today_rounded),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: amountCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Amount (₱)',
+                hintText: 'e.g. 150.00',
+                prefixIcon: Icon(Icons.payments_outlined),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: TraceColors.navyBlue),
+            onPressed: () async {
+              final amount = double.tryParse(amountCtrl.text.trim());
+              final semester = semesterCtrl.text.trim();
+              if (amount == null || amount <= 0 || semester.isEmpty) return;
+              final scaffoldMsg = ScaffoldMessenger.of(context);
+              final count = await FinancialService.assignMembershipFee(
+                amount: amount,
+                semester: semester,
+                recordedBy: 'Treasurer',
+              );
+              if (!ctx.mounted) return;
+              Navigator.pop(ctx);
+              scaffoldMsg.showSnackBar(
+                SnackBar(
+                  content: Text('$count membership fee record(s) assigned.'),
+                  backgroundColor: TraceColors.navyBlue,
+                ),
+              );
+              _loadData();
+            },
+            child: const Text('Assign', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

@@ -171,8 +171,9 @@ class AuthService {
   Future<String?> createAdmin(
     String name,
     String email,
-    String password,
-  ) async {
+    String password, {
+    String role = 'admin',
+  }) async {
     try {
       // Initialize a secondary Firebase app to prevent logging out the current admin
       FirebaseApp tempApp = await Firebase.initializeApp(
@@ -190,7 +191,7 @@ class AuthService {
         await FirestoreService.admins.doc(userCred.user!.uid).set({
           'name': name,
           'email': email,
-          'role': 'admin',
+          'role': role,
           'created_at': FieldValue.serverTimestamp(),
           'status': 'active',
         });

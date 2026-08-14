@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/student_session_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/shared_widgets.dart';
 import '../services/student_service.dart';
 import '../models/student.dart';
 import '../models/attendance.dart';
+import '../models/obligation.dart';
 import '../models/event.dart';
 import '../services/auth_service.dart';
+import '../services/financial_service.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
 
@@ -28,6 +31,7 @@ class _StudentDashboardScreenState
   bool _isLoading = false;
   Student? _student;
   List<Attendance> _attendanceList = [];
+  List<StudentObligation> _obligations = [];
   Map<String, Event> _eventsMap = {};
   bool _searched = false;
   String? _error;
@@ -66,28 +70,34 @@ class _StudentDashboardScreenState
       return;
     }
     final attendance = await StudentService.getAttendanceForStudent(student.id);
+    final obligations = await FinancialService.getObligationsForStudent(student.studentId);
 
+    // FIX: batch-fetch all events with a single whereIn query instead of N individual gets
     final Map<String, Event> eventMap = {};
-    for (var a in attendance) {
-      if (!eventMap.containsKey(a.eventId)) {
-        try {
-          final doc = await FirestoreService.db
-              .collection('events')
-              .doc(a.eventId)
-              .get();
-          if (doc.exists) {
-            eventMap[a.eventId] = Event.fromMap(
-              doc.data() as Map<String, dynamic>,
-              doc.id,
-            );
-          }
-        } catch (_) {}
-      }
+    final uniqueEventIds = attendance.map((a) => a.eventId).toSet().toList();
+
+    // Firestore whereIn supports up to 30 items per query; chunk if needed
+    const chunkSize = 30;
+    for (var i = 0; i < uniqueEventIds.length; i += chunkSize) {
+      final chunk = uniqueEventIds.skip(i).take(chunkSize).toList();
+      try {
+        final eventSnap = await FirestoreService.db
+            .collection('events')
+            .where(FieldPath.documentId, whereIn: chunk)
+            .get();
+        for (var doc in eventSnap.docs) {
+          eventMap[doc.id] = Event.fromMap(
+            doc.data(),
+            doc.id,
+          );
+        }
+      } catch (_) {}
     }
 
     setState(() {
       _student = student;
       _attendanceList = attendance;
+      _obligations = obligations;
       _eventsMap = eventMap;
       _isLoading = false;
     });
@@ -324,6 +334,14 @@ class _StudentDashboardScreenState
   }
 
   Widget _buildResults() {
+    final unsettled = _obligations
+        .where((o) => !o.isFullyPaid && o.status != 'non-monetary')
+        .toList();
+    final nonMonetary = _obligations
+        .where((o) => o.status == 'non-monetary')
+        .toList();
+    final currency = NumberFormat.currency(symbol: '₱', decimalDigits: 2);
+
     return Column(
       children: [
         // Student info card
@@ -443,6 +461,60 @@ class _StudentDashboardScreenState
           ),
         ),
         const SizedBox(height: 20),
+
+        // Obligations section — shown only when there are unsettled items
+        if (unsettled.isNotEmpty || nonMonetary.isNotEmpty) ...[
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: TraceColors.error.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: TraceColors.error.withValues(alpha: 0.25)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded,
+                        color: TraceColors.error, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Pending Obligations',
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: TraceColors.error,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: TraceColors.error,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${unsettled.length + nonMonetary.length}',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ...unsettled.map((o) => _obligationTile(o, currency, isMonetary: true)),
+                ...nonMonetary.map((o) => _obligationTile(o, currency, isMonetary: false)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+
         // Attendance list
         TraceCard(
           padding: const EdgeInsets.all(24),
@@ -592,6 +664,108 @@ class _StudentDashboardScreenState
           ),
           const SizedBox(width: 8),
           StatusChip.fromStatus(a.finalStatus),
+        ],
+      ),
+    );
+  }
+
+  Widget _obligationTile(StudentObligation o, NumberFormat currency, {required bool isMonetary}) {
+    Color tagColor;
+    IconData tagIcon;
+    String typeLabel;
+    switch (o.type) {
+      case 'sanction':
+        tagColor = TraceColors.error;
+        tagIcon = Icons.gavel_rounded;
+        typeLabel = 'Sanction';
+        break;
+      case 'membership_fee':
+        tagColor = TraceColors.royalBlue;
+        tagIcon = Icons.badge_rounded;
+        typeLabel = 'Membership Fee';
+        break;
+      case 'contribution':
+        tagColor = TraceColors.gold;
+        tagIcon = Icons.volunteer_activism_rounded;
+        typeLabel = 'Contribution';
+        break;
+      default:
+        tagColor = TraceColors.medGrey;
+        tagIcon = Icons.assignment_outlined;
+        typeLabel = 'Due';
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: tagColor.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: tagColor.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(tagIcon, color: tagColor, size: 16),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  o.title,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: TraceColors.navyBlue,
+                  ),
+                ),
+                if (o.remarks != null && o.remarks!.isNotEmpty)
+                  Text(
+                    o.remarks!,
+                    style: GoogleFonts.inter(
+                        fontSize: 11, color: TraceColors.medGrey),
+                  ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (isMonetary)
+                Text(
+                  currency.format(o.remainingBalance),
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: TraceColors.error,
+                  ),
+                )
+              else
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: tagColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    typeLabel,
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: tagColor,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );

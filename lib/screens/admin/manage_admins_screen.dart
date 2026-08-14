@@ -16,12 +16,22 @@ class ManageAdminsScreen extends ConsumerStatefulWidget {
 }
 
 class _ManageAdminsScreenState extends ConsumerState<ManageAdminsScreen> {
+  static const List<DropdownMenuItem<String>> _roleDropdownItems = [
+    DropdownMenuItem(value: 'superadmin', child: Text('Superadmin (President)')),
+    DropdownMenuItem(value: 'admin', child: Text('Admin')),
+    DropdownMenuItem(value: 'treasurer', child: Text('Treasurer')),
+    DropdownMenuItem(value: 'auditor', child: Text('Auditor')),
+    DropdownMenuItem(value: 'pio', child: Text('P.I.O.')),
+    DropdownMenuItem(value: 'scanner', child: Text('Scanner (Generic)')),
+  ];
+
   void _showAddAdminDialog() {
     final nameCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
     final passwordCtrl = TextEditingController();
     bool isProcessing = false;
     bool obscurePassword = true;
+    String role = 'admin';
 
     showModalBottomSheet(
       context: context,
@@ -103,6 +113,17 @@ class _ManageAdminsScreenState extends ConsumerState<ManageAdminsScreen> {
                   ),
                   obscureText: obscurePassword,
                 ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  initialValue: role,
+                  decoration: const InputDecoration(labelText: 'Role'),
+                  items: _roleDropdownItems,
+                  onChanged: (v) {
+                    if (v != null) {
+                      setModalState(() => role = v);
+                    }
+                  },
+                ),
                 const SizedBox(height: 32),
                 if (isProcessing)
                   const Center(child: CircularProgressIndicator())
@@ -138,6 +159,7 @@ class _ManageAdminsScreenState extends ConsumerState<ManageAdminsScreen> {
                         nameCtrl.text.trim(),
                         emailCtrl.text.trim(),
                         passwordCtrl.text,
+                        role: role,
                       );
 
                       if (!ctx.mounted) return;
@@ -244,13 +266,7 @@ class _ManageAdminsScreenState extends ConsumerState<ManageAdminsScreen> {
                 DropdownButtonFormField<String>(
                   initialValue: role,
                   decoration: const InputDecoration(labelText: 'Role'),
-                  items: const [
-                    DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                    DropdownMenuItem(
-                      value: 'superadmin',
-                      child: Text('Superadmin'),
-                    ),
-                  ],
+                  items: _roleDropdownItems,
                   onChanged: (v) {
                     if (v != null) {
                       setModalState(() => role = v);
@@ -358,6 +374,17 @@ class _ManageAdminsScreenState extends ConsumerState<ManageAdminsScreen> {
   @override
   Widget build(BuildContext context) {
     final currentEmail = ref.watch(authServiceProvider).currentUser?.email;
+    final currentRole = ref.watch(adminRoleProvider).value;
+
+    if (currentRole != 'superadmin') {
+      return Scaffold(
+        backgroundColor: TraceColors.offWhite,
+        appBar: TraceAppBar(title: 'Manage Admins', showBackButton: true),
+        body: const Center(
+          child: Text('Permission Denied. Only Superadmins can manage accounts.'),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: TraceColors.offWhite,

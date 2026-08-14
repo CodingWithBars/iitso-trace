@@ -1,20 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../theme/app_theme.dart';
 
 class HeroSection extends StatelessWidget {
   const HeroSection({super.key});
 
-  static const String _apkUrl = 'https://tinyurl.com/mtptean6';
-
-  void _launchApkDownload() async {
-    final uri = Uri.parse(_apkUrl);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -172,7 +163,7 @@ class HeroSection extends StatelessWidget {
             MouseRegion(
               cursor: SystemMouseCursors.click,
               child: GestureDetector(
-                onTap: _launchApkDownload,
+                onTap: () => context.go('/admin/login'),
                 child: SizedBox(
                   width: 250,
                   child: Container(
@@ -181,36 +172,27 @@ class HeroSection extends StatelessWidget {
                       vertical: 16,
                     ),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFFFD700), Color(0xFFF5A623)],
-                      ),
+                      color: Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: TraceColors.gold.withValues(alpha: 0.4),
-                          blurRadius: 20,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Icon(
-                          Icons.android_rounded,
-                          color: Color(0xFF0D1B3E),
+                          Icons.admin_panel_settings_rounded,
+                          color: Colors.white,
                           size: 22,
                         ),
                         const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Download trace',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.inter(
-                              color: const Color(0xFF0D1B3E),
-                              fontWeight: FontWeight.w800,
-                              fontSize: 15,
-                            ),
+                        Text(
+                          'Officer Login',
+                          style: GoogleFonts.inter(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
                           ),
                         ),
                       ],

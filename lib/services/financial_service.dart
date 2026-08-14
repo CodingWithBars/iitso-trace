@@ -163,7 +163,8 @@ class FinancialService {
   // Sanctions Auto-Generator
   // ---------------------------------------------------------------------------
 
-  /// Automatically generate sanctions for students missing attendance or lacking event hours
+  /// Automatically generate sanctions for students missing attendance or lacking event hours.
+  /// Safe to call multiple times — will not create duplicate sanctions.
   static Future<int> autoGenerateSanctionsForEvent({
     required Event event,
     required double finePerMissedEvent,
@@ -184,6 +185,18 @@ class FinancialService {
       }
     }
 
+    // FIX: Check for already-created sanctions to prevent duplicates on re-run
+    final existingSanctionsSnap = await _db
+        .collection('student_obligations')
+        .where('event_id', isEqualTo: event.id)
+        .where('type', isEqualTo: 'sanction')
+        .get();
+    final alreadySanctioned = <String>{};
+    for (final doc in existingSanctionsSnap.docs) {
+      final sId = doc.data()['student_id'] as String?;
+      if (sId != null) alreadySanctioned.add(sId);
+    }
+
     int sanctionCount = 0;
     final batch = _db.batch();
     final now = DateTime.now();
@@ -191,8 +204,10 @@ class FinancialService {
     for (final student in students) {
       final hasAttended = attendedStudentIds.contains(student.id) ||
           attendedStudentIds.contains(student.studentId);
+      final alreadyHas = alreadySanctioned.contains(student.id) ||
+          alreadySanctioned.contains(student.studentId);
 
-      if (!hasAttended && finePerMissedEvent > 0) {
+      if (!hasAttended && !alreadyHas && finePerMissedEvent > 0) {
         final docRef = _db.collection('student_obligations').doc();
         final sanction = StudentObligation(
           id: docRef.id,
@@ -217,6 +232,7 @@ class FinancialService {
     }
     return sanctionCount;
   }
+
 
   // ---------------------------------------------------------------------------
   // Organization Financial Transparency Ledger
@@ -291,4 +307,296 @@ class FinancialService {
   static Future<void> deleteObligation(String obligationId) async {
     await _db.collection('student_obligations').doc(obligationId).delete();
   }
+
+  /// Apply the event's built-in sanctions to all students not recorded in attendance.
+  /// Returns the number of sanction records created.
+  static Future<int> applyEventSanctions(Event event, String recordedBy) async {
+    // Only proceed if event has a sanction configured
+    final hasMonetary = (event.sanctionAmount ?? 0) > 0;
+    final hasNonMonetary = event.sanctionDescription != null && event.sanctionDescription!.isNotEmpty;
+    if (!hasMonetary && !hasNonMonetary) return 0;
+
+    final students = await StudentService.getAllStudents();
+    final attendanceSnap = await _db
+        .collection('attendance')
+        .where('event_id', isEqualTo: event.id)
+        .get();
+
+    final attendanceRecords = <String, Map<String, dynamic>>{};
+    for (final doc in attendanceSnap.docs) {
+      final data = doc.data();
+      final sId = data['student_id'] as String?;
+      if (sId != null && sId.isNotEmpty) {
+        attendanceRecords[sId] = data;
+      }
+    }
+
+    // Also check if this student already has a sanction for this event to avoid duplicates
+    final existingSanctionsSnap = await _db
+        .collection('student_obligations')
+        .where('event_id', isEqualTo: event.id)
+        .where('type', isEqualTo: 'sanction')
+        .get();
+    final alreadySanctioned = <String>{};
+    for (final doc in existingSanctionsSnap.docs) {
+      final sId = doc.data()['student_id'] as String?;
+      if (sId != null) alreadySanctioned.add(sId);
+    }
+
+    int count = 0;
+    final batch = _db.batch();
+    final now = DateTime.now();
+
+    for (final student in students) {
+      final id1 = student.id;
+      final id2 = student.studentId;
+      final attData = attendanceRecords[id1] ?? attendanceRecords[id2];
+      final alreadyHas = alreadySanctioned.contains(id1) || alreadySanctioned.contains(id2);
+
+      if (alreadyHas) continue;
+
+      double amount = 0.0;
+      String title = '';
+      String remarks = '';
+      bool createObligation = false;
+
+      if (attData == null) {
+        // Absent
+        createObligation = true;
+        amount = hasMonetary ? event.sanctionAmount! : 0.0;
+        title = 'Absent: ${event.eventName}';
+        remarks = hasNonMonetary
+            ? event.sanctionDescription!
+            : 'Absent on ${event.date.toString().split(' ').first}';
+      } else if (attData['final_status'] == 'Late' && hasMonetary) {
+        // Late
+        final totalHours = _calculateTotalEventHours(event);
+        if (totalHours > 0) {
+          final missedHours = _calculateMissedHours(event, attData);
+          if (missedHours > 0) {
+            amount = (missedHours / totalHours) * event.sanctionAmount!;
+            // Round to nearest multiple of 5 for clean currency amounts (e.g., 50-45-40)
+            amount = (amount / 5.0).round() * 5.0;
+            if (amount > event.sanctionAmount!) amount = event.sanctionAmount!;
+            
+            if (amount > 0) {
+              createObligation = true;
+              title = 'Late: ${event.eventName}';
+              remarks = 'Late penalty for missed hours (${missedHours.toStringAsFixed(1)} hrs)';
+            }
+          }
+        }
+      }
+
+      if (createObligation) {
+        final docRef = _db.collection('student_obligations').doc();
+        final sanction = StudentObligation(
+          id: docRef.id,
+          studentId: student.studentId,
+          studentName: student.name,
+          title: title,
+          type: 'sanction',
+          eventId: event.id,
+          amount: amount,
+          amountPaid: 0.0,
+          status: amount > 0 ? 'unpaid' : 'non-monetary',
+          remarks: remarks,
+          createdAt: now,
+        );
+        batch.set(docRef, sanction.toMap());
+        count++;
+      }
+    }
+
+    if (count > 0) await batch.commit();
+    return count;
+  }
+
+  static double _calculateTotalEventHours(Event event) {
+    double total = 0;
+    if (event.morningTimeIn != null && event.morningTimeOut != null) {
+      final amIn = _parseTimeStr(event.morningTimeIn!);
+      final amOut = _parseTimeStr(event.morningTimeOut!);
+      if (amOut > amIn) total += (amOut - amIn);
+    }
+    if (event.afternoonTimeIn != null && event.afternoonTimeOut != null) {
+      final pmIn = _parseTimeStr(event.afternoonTimeIn!);
+      final pmOut = _parseTimeStr(event.afternoonTimeOut!);
+      if (pmOut > pmIn) total += (pmOut - pmIn);
+    }
+    return total;
+  }
+
+  static double _parseTimeStr(String timeStr) {
+    try {
+      final parts = timeStr.split(':');
+      final hour = int.parse(parts[0]);
+      final minute = int.parse(parts[1]);
+      return hour + (minute / 60.0);
+    } catch (_) {
+      return 0.0;
+    }
+  }
+
+  static double _calculateMissedHours(Event event, Map<String, dynamic> data) {
+    if (data.containsKey('manual_late_hours') && data['manual_late_hours'] != null) {
+      return (data['manual_late_hours'] as num).toDouble();
+    }
+
+    double missed = 0.0;
+
+    // AM Session
+    if (event.morningTimeIn != null && event.morningTimeOut != null) {
+      final amIn = _parseTimeStr(event.morningTimeIn!);
+      final amOut = _parseTimeStr(event.morningTimeOut!);
+      final amDuration = amOut - amIn;
+      if (amDuration > 0) {
+        if (data['time_in_am'] == null) {
+          missed += amDuration; // Missed entire AM session
+        } else {
+          final actualAmInDt = (data['time_in_am'] as Timestamp).toDate();
+          final actualAmIn = actualAmInDt.hour + (actualAmInDt.minute / 60.0);
+          if (actualAmIn > amIn) {
+            final lateHours = actualAmIn - amIn;
+            missed += (lateHours > amDuration) ? amDuration : lateHours;
+          }
+        }
+      }
+    }
+
+    // PM Session
+    if (event.afternoonTimeIn != null && event.afternoonTimeOut != null) {
+      final pmIn = _parseTimeStr(event.afternoonTimeIn!);
+      final pmOut = _parseTimeStr(event.afternoonTimeOut!);
+      final pmDuration = pmOut - pmIn;
+      if (pmDuration > 0) {
+        if (data['time_in_pm'] == null) {
+          missed += pmDuration;
+        } else {
+          final actualPmInDt = (data['time_in_pm'] as Timestamp).toDate();
+          final actualPmIn = actualPmInDt.hour + (actualPmInDt.minute / 60.0);
+          if (actualPmIn > pmIn) {
+            final lateHours = actualPmIn - pmIn;
+            missed += (lateHours > pmDuration) ? pmDuration : lateHours;
+          }
+        }
+      }
+    }
+
+    return missed;
+  }
+
+  /// Bulk-assign event contribution obligation to all registered students.
+  static Future<int> applyEventContribution(Event event, String recordedBy) async {
+    final contribution = event.eventContribution ?? 0;
+    if (contribution <= 0) return 0;
+
+    final students = await StudentService.getAllStudents();
+
+    // Avoid duplicating contribution for same event
+    final existingSnap = await _db
+        .collection('student_obligations')
+        .where('event_id', isEqualTo: event.id)
+        .where('type', isEqualTo: 'contribution')
+        .get();
+    final alreadyAssigned = <String>{};
+    for (final doc in existingSnap.docs) {
+      final sId = doc.data()['student_id'] as String?;
+      if (sId != null) alreadyAssigned.add(sId);
+    }
+
+    int count = 0;
+    final batch = _db.batch();
+    final now = DateTime.now();
+
+    for (final student in students) {
+      if (!alreadyAssigned.contains(student.studentId) &&
+          !alreadyAssigned.contains(student.id)) {
+        final docRef = _db.collection('student_obligations').doc();
+        final obligation = StudentObligation(
+          id: docRef.id,
+          studentId: student.studentId,
+          studentName: student.name,
+          title: 'Contribution: ${event.eventName}',
+          type: 'contribution',
+          eventId: event.id,
+          amount: contribution,
+          amountPaid: 0.0,
+          status: 'unpaid',
+          remarks: 'Event contribution for ${event.eventName}',
+          createdAt: now,
+        );
+        batch.set(docRef, obligation.toMap());
+        count++;
+      }
+    }
+
+    if (count > 0) await batch.commit();
+    return count;
+  }
+
+  /// Mark an obligation as fully settled (paid/fulfilled).
+  static Future<void> markObligationSettled(String obligationId) async {
+    await _db.collection('student_obligations').doc(obligationId).update({
+      'status': 'paid',
+      'amount_paid': await _db
+          .collection('student_obligations')
+          .doc(obligationId)
+          .get()
+          .then((d) => d.data()?['amount'] ?? 0),
+    });
+  }
+
+  /// Assign membership fee to all students (or a subset). Skips students who already have it.
+  static Future<int> assignMembershipFee({
+    required double amount,
+    required String semester, // e.g. '2nd Semester AY 2024-2025'
+    required String recordedBy,
+    List<Student>? targetStudents, // null = all students
+  }) async {
+    final students = targetStudents ?? await StudentService.getAllStudents();
+    final title = 'Org Membership Fee – $semester';
+
+    // Check existing to avoid duplicates
+    final existingSnap = await _db
+        .collection('student_obligations')
+        .where('title', isEqualTo: title)
+        .where('type', isEqualTo: 'membership_fee')
+        .get();
+    final alreadyAssigned = <String>{};
+    for (final doc in existingSnap.docs) {
+      final sId = doc.data()['student_id'] as String?;
+      if (sId != null) alreadyAssigned.add(sId);
+    }
+
+    int count = 0;
+    final batch = _db.batch();
+    final now = DateTime.now();
+
+    for (final student in students) {
+      if (!alreadyAssigned.contains(student.studentId) &&
+          !alreadyAssigned.contains(student.id)) {
+        final docRef = _db.collection('student_obligations').doc();
+        final obligation = StudentObligation(
+          id: docRef.id,
+          studentId: student.studentId,
+          studentName: student.name,
+          title: title,
+          type: 'membership_fee',
+          eventId: null,
+          amount: amount,
+          amountPaid: 0.0,
+          status: 'unpaid',
+          remarks: 'Org membership dues for $semester',
+          createdAt: now,
+        );
+        batch.set(docRef, obligation.toMap());
+        count++;
+      }
+    }
+
+    if (count > 0) await batch.commit();
+    return count;
+  }
 }
+

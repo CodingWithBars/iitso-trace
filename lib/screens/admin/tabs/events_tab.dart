@@ -10,11 +10,13 @@ import '../../../models/event.dart';
 class EventsTab extends StatefulWidget {
   final void Function(Event event) onEventTap;
   final VoidCallback onNewEvent;
+  final String currentRole;
 
   const EventsTab({
     super.key,
     required this.onEventTap,
     required this.onNewEvent,
+    this.currentRole = 'admin',
   });
 
   @override
@@ -58,9 +60,11 @@ class _EventsTabState extends State<EventsTab> {
 
   @override
   Widget build(BuildContext context) {
+    final canAddEvent = widget.currentRole != 'scanner' && widget.currentRole != 'treasurer';
+    
     return Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: canAddEvent ? FloatingActionButton.extended(
         onPressed: widget.onNewEvent,
         backgroundColor: TraceColors.gold,
         icon: const Icon(Icons.add_rounded, color: TraceColors.navyBlue),
@@ -71,7 +75,7 @@ class _EventsTabState extends State<EventsTab> {
             color: TraceColors.navyBlue,
           ),
         ),
-      ),
+      ) : null,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

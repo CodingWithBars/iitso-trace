@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
 import '../../services/student_service.dart';
+import '../../services/excel_report_service.dart';
 
 class StudentsListScreen extends StatefulWidget {
   const StudentsListScreen({super.key});
@@ -25,6 +26,40 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
     '3rd Year',
     '4th Year',
   ];
+  bool _isExporting = false;
+
+  Future<void> _exportToExcel() async {
+    setState(() => _isExporting = true);
+    try {
+      final snap = await FirestoreService.db.collection('students').get();
+      final activeDocs = snap.docs.where((doc) {
+        final data = doc.data();
+        return data['is_archived'] != true;
+      }).toList();
+      
+      await ExcelReportService.generateStudentsExcelByYear(activeDocs);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Excel report generated successfully.'),
+            backgroundColor: TraceColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error generating report: $e'),
+            backgroundColor: TraceColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +76,25 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
           onPressed: () => context.pop(),
         ),
         actions: [
+          _isExporting
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.only(right: 16.0),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: TraceColors.white,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  ),
+                )
+              : IconButton(
+                  icon: const Icon(Icons.download_rounded, color: TraceColors.white),
+                  tooltip: 'Export Excel',
+                  onPressed: _exportToExcel,
+                ),
           IconButton(
             icon: const Icon(Icons.restore_page_rounded, color: TraceColors.white),
             tooltip: 'Restore Archived Records',

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:async';
 import '../theme/app_theme.dart';
 import '../utils/pwa_helper.dart';
 
@@ -14,16 +15,39 @@ class PwaInstallBanner extends StatefulWidget {
 class _PwaInstallBannerState extends State<PwaInstallBanner> {
   bool _isDismissed  = false;
   bool _isInstalled  = false;
+  bool _canInstall   = false;
+  Timer? _statusTimer;
 
   @override
   void initState() {
     super.initState();
-    if (kIsWeb) _checkPwaStatus();
+    if (kIsWeb) {
+      _checkPwaStatus();
+      _statusTimer = Timer.periodic(const Duration(seconds: 1), (_) => _checkPwaStatus());
+    }
+  }
+
+  @override
+  void dispose() {
+    _statusTimer?.cancel();
+    super.dispose();
   }
 
   void _checkPwaStatus() {
+    if (!mounted) return;
     try {
-      if (isPwaInstalled()) setState(() => _isInstalled = true);
+      final installed = isPwaInstalled();
+      final hasPrompt = hasNativePwaPrompt();
+      final ios = isIOSPlatform();
+      
+      final canInstall = hasPrompt || ios;
+      
+      if (installed != _isInstalled || canInstall != _canInstall) {
+        setState(() {
+          _isInstalled = installed;
+          _canInstall = canInstall;
+        });
+      }
     } catch (_) {}
   }
 
@@ -61,7 +85,7 @@ class _PwaInstallBannerState extends State<PwaInstallBanner> {
 
   @override
   Widget build(BuildContext context) {
-    if (!kIsWeb || _isDismissed || _isInstalled) return const SizedBox.shrink();
+    if (!kIsWeb || _isDismissed || _isInstalled || !_canInstall) return const SizedBox.shrink();
 
     return SafeArea(
       top: false,

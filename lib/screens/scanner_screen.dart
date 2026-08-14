@@ -123,7 +123,9 @@ class _ScannerScreenState extends State<ScannerScreen>
         continue;
       }
 
-      if ((isToday && now.isAfter(e.date)) || e.status == 'ongoing') {
+      // FIX: Both 'ongoing' AND 'upcoming' statuses require isToday check
+      // to prevent events from other dates appearing in the scanner.
+      if (isToday) {
         events.add(e);
       }
     }
@@ -359,7 +361,11 @@ class _ScannerScreenState extends State<ScannerScreen>
     if (rawValue == null || rawValue.isEmpty) return;
 
     setState(() => _isProcessing = true);
-    await _controller.stop();
+
+    // FIX: wrap stop() in try-catch so a camera error doesn't permanently lock the scanner
+    try {
+      await _controller.stop();
+    } catch (_) {}
 
     final result = await AttendanceService.processScan(
       qrHash: rawValue,
@@ -370,7 +376,11 @@ class _ScannerScreenState extends State<ScannerScreen>
       offlineAttendance: _offlineAttendance,
     );
 
-    if (!mounted) return;
+    if (!mounted) {
+      // Widget was disposed while processing — reset state and bail
+      return;
+    }
+
     final bool canVoid =
         result.status == ScanResultStatus.timeInSuccess ||
         result.status == ScanResultStatus.timeOutSuccess ||
@@ -382,8 +392,10 @@ class _ScannerScreenState extends State<ScannerScreen>
       result,
       activePhase,
       () {
-        _controller.start();
-        setState(() => _isProcessing = false);
+        if (mounted) {
+          _controller.start();
+          setState(() => _isProcessing = false);
+        }
       },
       onVoid: canVoid
           ? () async {
@@ -401,8 +413,10 @@ class _ScannerScreenState extends State<ScannerScreen>
                   );
                 }
               }
-              _controller.start();
-              setState(() => _isProcessing = false);
+              if (mounted) {
+                _controller.start();
+                setState(() => _isProcessing = false);
+              }
             }
           : null,
     );

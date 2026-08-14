@@ -14,7 +14,6 @@ import 'screens/admin/admin_login_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/admin/admin_profile_screen.dart';
 import 'screens/admin/admin_student_profile_screen.dart';
-import 'screens/admin/sync_center_screen.dart';
 import 'screens/admin/manage_admins_screen.dart';
 import 'screens/admin/students_list_screen.dart';
 import 'screens/admin/attendance_events_screen.dart';
@@ -25,6 +24,8 @@ import 'screens/admin/financial_dashboard_screen.dart';
 import 'screens/admin/student_obligations_list_screen.dart';
 import 'screens/admin/org_cashflow_logs_screen.dart';
 import 'screens/admin/record_manual_payment_screen.dart';
+import 'screens/admin/event_form_screen.dart';
+import 'models/event.dart';
 import 'screens/claim_id_screen.dart';
 import 'screens/privacy_policy_screen.dart';
 import 'screens/terms_conditions_screen.dart';
@@ -74,6 +75,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       // If logged-in admin somehow lands on /admin/login, redirect to dashboard
       if (state.uri.path == '/admin/login' && isLoggedIn) {
         return '/admin/dashboard';
+      }
+
+      // Role-based route guards
+      if (isLoggedIn) {
+        final currentRole = ref.read(adminRoleProvider).value;
+        if (currentRole != null) {
+          // Only superadmin can access manage_admins
+          if (state.uri.path == '/admin/manage_admins' &&
+              currentRole != 'superadmin') {
+            return '/admin/dashboard';
+          }
+        }
       }
 
       return null;
@@ -209,6 +222,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const RecordManualPaymentScreen(),
       ),
       GoRoute(
+        path: '/admin/event-form',
+        builder: (context, state) => EventFormScreen(
+          event: state.extra as Event?,
+        ),
+      ),
+      GoRoute(
         path: '/admin/logs',
         builder: (context, state) => const ActivityLogsScreen(),
       ),
@@ -219,10 +238,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/profile',
         builder: (context, state) => const AdminProfileScreen(),
-      ),
-      GoRoute(
-        path: '/admin/sync-center',
-        builder: (context, state) => const SyncCenterScreen(),
       ),
       GoRoute(
         path: '/scanner',

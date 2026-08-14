@@ -28,30 +28,18 @@ class OverviewTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final role = ref.watch(adminRoleProvider).value;
+    
     final canManageAdmins = role == 'superadmin';
-    final canManageFunds = role == 'superadmin' || role == 'auditor';
-
-    void showAccessDenied(String message) {
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.lock_rounded, color: TraceColors.error),
-              SizedBox(width: 8),
-              Text('Access Denied', style: TextStyle(color: TraceColors.error)),
-            ],
-          ),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-    }
+    final canViewFunds = role == 'superadmin' || role == 'admin' || role == 'treasurer' || role == 'auditor';
+    final canManageFunds = role == 'superadmin' || role == 'admin' || role == 'treasurer';
+    final canViewEvents = role == 'superadmin' || role == 'admin' || role == 'pio' || role == 'scanner';
+    final canAddEvent = role == 'superadmin' || role == 'admin' || role == 'pio';
+    final canViewStudents = role == 'superadmin' || role == 'admin' || role == 'treasurer' || role == 'scanner';
+    final canPostNews = role == 'superadmin' || role == 'admin' || role == 'pio';
+    final canViewScans = role == 'superadmin' || role == 'admin' || role == 'pio' || role == 'scanner';
+    final canManageAttendance = role == 'superadmin' || role == 'admin' || role == 'scanner';
+    final canViewClaims = role == 'superadmin' || role == 'admin';
+    final canGenerateReport = role == 'superadmin' || role == 'admin' || role == 'treasurer' || role == 'auditor';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -128,217 +116,107 @@ class OverviewTab extends ConsumerWidget {
                       return LayoutBuilder(
                         builder: (ctx, constraints) {
                           final isWide = constraints.maxWidth > 600;
-
-                          Widget buildCard(
-                            Widget child, {
-                            bool fullWidth = false,
-                          }) {
-                            return AspectRatio(
-                              aspectRatio: isWide
-                                  ? 2.0
-                                  : (fullWidth ? 4.0 : 2.0),
-                              child: child,
+                          
+                          final List<Widget> cards = [];
+                          
+                          if (canViewFunds) {
+                            cards.addAll([
+                              AdminStatCard(
+                                label: 'Collected',
+                                value: '₱${NumberFormat('#,##0.00', 'en_US').format(income)}',
+                                icon: Icons.account_balance_wallet_rounded,
+                                color: Colors.green,
+                              ),
+                              AdminStatCard(
+                                label: 'Expenses',
+                                value: '₱${NumberFormat('#,##0.00', 'en_US').format(expense)}',
+                                icon: Icons.money_off_rounded,
+                                color: TraceColors.error,
+                              ),
+                            ]);
+                          }
+                          
+                          if (canViewEvents) {
+                            cards.add(
+                              AdminStatCard(
+                                label: 'Events',
+                                value: eventCount.toString(),
+                                icon: Icons.event_rounded,
+                                color: TraceColors.gold,
+                              ),
                             );
                           }
-
-                          if (isWide) {
-                            return Column(
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: buildCard(
-                                        AdminStatCard(
-                                          label: 'Collected',
-                                          value:
-                                              '₱${NumberFormat('#,##0.00', 'en_US').format(income)}',
-                                          icon: Icons
-                                              .account_balance_wallet_rounded,
-                                          color: Colors.green,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: buildCard(
-                                        AdminStatCard(
-                                          label: 'Expenses',
-                                          value:
-                                              '₱${NumberFormat('#,##0.00', 'en_US').format(expense)}',
-                                          icon: Icons.money_off_rounded,
-                                          color: TraceColors.error,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: buildCard(
-                                        AdminStatCard(
-                                          label: 'Events',
-                                          value: eventCount.toString(),
-                                          icon: Icons.event_rounded,
-                                          color: TraceColors.gold,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: buildCard(
-                                        GestureDetector(
-                                          onTap: () =>
-                                              context.push('/admin/students'),
-                                          child: AdminStatCard(
-                                            label: 'Students',
-                                            value: studentCount.toString(),
-                                            icon: Icons.people_rounded,
-                                            color: TraceColors.royalBlue,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                          
+                          if (canViewStudents) {
+                            cards.add(
+                              GestureDetector(
+                                onTap: () => context.push('/admin/students'),
+                                child: AdminStatCard(
+                                  label: 'Students',
+                                  value: studentCount.toString(),
+                                  icon: Icons.people_rounded,
+                                  color: TraceColors.royalBlue,
                                 ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: buildCard(
-                                        AdminStatCard(
-                                          label: 'Scans Today',
-                                          value: todayScans.toString(),
-                                          icon: Icons.qr_code_scanner_rounded,
-                                          color: Colors.purple,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: buildCard(
-                                        GestureDetector(
-                                          onTap: () =>
-                                              context.push('/admin/id-claims'),
-                                          child: AdminStatCard(
-                                            label: 'Pending Claims',
-                                            value: pendingClaimsCount
-                                                .toString(),
-                                            icon: Icons.verified_user_rounded,
-                                            color: pendingClaimsCount > 0
-                                                ? TraceColors.error
-                                                : TraceColors.medGrey,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    const Expanded(child: SizedBox()),
-                                    const SizedBox(width: 12),
-                                    const Expanded(child: SizedBox()),
-                                  ],
-                                ),
-                              ],
+                              ),
                             );
                           }
+                          
+                          if (canViewScans) {
+                            cards.add(
+                              AdminStatCard(
+                                label: 'Scans Today',
+                                value: todayScans.toString(),
+                                icon: Icons.qr_code_scanner_rounded,
+                                color: Colors.purple,
+                              ),
+                            );
+                          }
+                          
+                          if (canViewClaims) {
+                            cards.add(
+                              GestureDetector(
+                                onTap: () => context.push('/admin/id-claims'),
+                                child: AdminStatCard(
+                                  label: 'Pending Claims',
+                                  value: pendingClaimsCount.toString(),
+                                  icon: Icons.verified_user_rounded,
+                                  color: pendingClaimsCount > 0 ? TraceColors.error : TraceColors.medGrey,
+                                ),
+                              ),
+                            );
+                          }
+                          
+                          if (cards.isEmpty) {
+                             return Container(
+                               width: double.infinity,
+                               padding: const EdgeInsets.all(24),
+                               decoration: BoxDecoration(
+                                 color: Colors.white,
+                                 borderRadius: BorderRadius.circular(12),
+                                 border: Border.all(color: TraceColors.lightGrey),
+                               ),
+                               child: Center(
+                                 child: Text(
+                                   'No metrics available for your role.',
+                                   style: GoogleFonts.inter(color: TraceColors.medGrey),
+                                 )
+                               ),
+                             );
+                          }
 
-                          // Mobile Layout
-                          return Column(
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: buildCard(
-                                      fullWidth: true,
-                                      AdminStatCard(
-                                        label: 'Collected',
-                                        value:
-                                            '₱${NumberFormat('#,##0.00', 'en_US').format(income)}',
-                                        icon: Icons
-                                            .account_balance_wallet_rounded,
-                                        color: Colors.green,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: buildCard(
-                                      fullWidth: true,
-                                      AdminStatCard(
-                                        label: 'Expenses',
-                                        value:
-                                            '₱${NumberFormat('#,##0.00', 'en_US').format(expense)}',
-                                        icon: Icons.money_off_rounded,
-                                        color: TraceColors.error,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: buildCard(
-                                      AdminStatCard(
-                                        label: 'Events',
-                                        value: eventCount.toString(),
-                                        icon: Icons.event_rounded,
-                                        color: TraceColors.gold,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: buildCard(
-                                      GestureDetector(
-                                        onTap: () =>
-                                            context.push('/admin/students'),
-                                        child: AdminStatCard(
-                                          label: 'Students',
-                                          value: studentCount.toString(),
-                                          icon: Icons.people_rounded,
-                                          color: TraceColors.royalBlue,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: buildCard(
-                                      AdminStatCard(
-                                        label: 'Scans Today',
-                                        value: todayScans.toString(),
-                                        icon: Icons.qr_code_scanner_rounded,
-                                        color: Colors.purple,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: buildCard(
-                                      GestureDetector(
-                                        onTap: () =>
-                                            context.push('/admin/id-claims'),
-                                        child: AdminStatCard(
-                                          label: 'Pending Claims',
-                                          value: pendingClaimsCount.toString(),
-                                          icon: Icons.verified_user_rounded,
-                                          color: pendingClaimsCount > 0
-                                              ? TraceColors.error
-                                              : TraceColors.medGrey,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                          final int crossAxisCount = isWide ? 4 : 2;
+                          final double cardWidth = (constraints.maxWidth - (12 * (crossAxisCount - 1))) / crossAxisCount;
+
+                          return Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: cards.map((c) => SizedBox(
+                               width: cardWidth,
+                               child: AspectRatio(
+                                 aspectRatio: 2.0,
+                                 child: c,
+                               ),
+                            )).toList(),
                           );
                         },
                       );
@@ -361,116 +239,73 @@ class OverviewTab extends ConsumerWidget {
                   color: TraceColors.navyBlue,
                 ),
               ),
-              TextButton.icon(
-                onPressed: () => context.push('/admin/logs'),
-                icon: const Icon(Icons.history_rounded, size: 18),
-                label: Text(
-                  'Logs',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                ),
-                style: TextButton.styleFrom(
-                  foregroundColor: TraceColors.royalBlue,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+              if (role == 'superadmin' || role == 'admin') 
+                TextButton.icon(
+                  onPressed: () => context.push('/admin/logs'),
+                  icon: const Icon(Icons.history_rounded, size: 18),
+                  label: Text(
+                    'Logs',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: TraceColors.royalBlue,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 12),
-          Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: AdminQuickAction(
-                      label: 'New Event',
-                      icon: Icons.add_rounded,
-                      onTap: onNewEvent,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: AdminQuickAction(
-                      label: 'Attendance',
-                      icon: Icons.how_to_reg_rounded,
-                      onTap: onAttendance,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: AdminQuickAction(
-                      label: 'Post News',
-                      icon: Icons.campaign_rounded,
-                      onTap: onPostNews,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: AdminQuickAction(
-                      label: 'Add Fund',
-                      icon: Icons.attach_money_rounded,
-                      onTap: canManageFunds
-                          ? onAddFund
-                          : () => showAccessDenied(
-                              'Only the Super Admin or Auditor can add funds.',
-                            ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: AdminQuickAction(
-                      label: 'Manage Admins',
-                      icon: Icons.admin_panel_settings_rounded,
-                      onTap: canManageAdmins
-                          ? onAddAdmin
-                          : () => showAccessDenied(
-                              'Only the Super Admin can manage admin accounts.',
-                            ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: AdminQuickAction(
-                      label: 'My Profile',
-                      icon: Icons.person_rounded,
-                      onTap: () => context.push('/admin/profile'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: AdminQuickAction(
-                      label: 'Semester Report',
-                      icon: Icons.assessment_rounded,
-                      onTap: () async {
-                        await CsvReportService.generateSemesterReport();
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: AdminQuickAction(
-                      label: 'Sync Center',
-                      icon: Icons.cloud_sync_rounded,
-                      onTap: () => context.push('/admin/sync-center'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+          
+          LayoutBuilder(
+            builder: (ctx, constraints) {
+              final isWide = constraints.maxWidth > 500;
+              final crossAxisCount = isWide ? 4 : 2;
+              final double btnWidth = (constraints.maxWidth - (8 * (crossAxisCount - 1))) / crossAxisCount;
+
+              final List<Widget> actions = [];
+              
+              if (canAddEvent) {
+                actions.add(AdminQuickAction(label: 'New Event', icon: Icons.add_rounded, onTap: onNewEvent));
+              }
+              
+              if (canManageAttendance) {
+                actions.add(AdminQuickAction(label: 'Attendance', icon: Icons.how_to_reg_rounded, onTap: onAttendance));
+              }
+              
+              if (canPostNews) {
+                actions.add(AdminQuickAction(label: 'Post News', icon: Icons.campaign_rounded, onTap: onPostNews));
+              }
+              
+              if (canManageFunds) {
+                actions.add(AdminQuickAction(label: 'Add Fund', icon: Icons.attach_money_rounded, onTap: onAddFund));
+              }
+              
+              if (canManageAdmins) {
+                actions.add(AdminQuickAction(label: 'Manage Admins', icon: Icons.admin_panel_settings_rounded, onTap: onAddAdmin));
+              }
+              
+              actions.add(AdminQuickAction(label: 'My Profile', icon: Icons.person_rounded, onTap: () => context.push('/admin/profile')));
+              
+              if (canGenerateReport) {
+                actions.add(AdminQuickAction(
+                  label: 'Semester Report',
+                  icon: Icons.assessment_rounded,
+                  onTap: () async {
+                    await CsvReportService.generateSemesterReport();
+                  }
+                ));
+              }
+              
+
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: actions.map((a) => SizedBox(width: btnWidth, child: a)).toList(),
+              );
+            }
           ),
         ],
       ),

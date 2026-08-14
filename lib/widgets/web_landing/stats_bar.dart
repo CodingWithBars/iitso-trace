@@ -54,19 +54,16 @@ class StatsBar extends StatelessWidget {
                                 _statItem(
                                   studentCount.toString(),
                                   'Registered Students',
-                                  Icons.people_rounded,
                                 ),
                                 _vDivider(),
                                 _statItem(
                                   '₱${formatAmount(totalIncome)}',
                                   'Total Collected',
-                                  Icons.monetization_on_rounded,
                                 ),
                                 _vDivider(),
                                 _statItem(
                                   eventCount.toString(),
                                   'Events Held',
-                                  Icons.event_rounded,
                                 ),
                               ],
                             )
@@ -79,13 +76,11 @@ class StatsBar extends StatelessWidget {
                                     _statItem(
                                       studentCount.toString(),
                                       'Students',
-                                      Icons.people_rounded,
                                     ),
                                     _vDivider(),
                                     _statItem(
                                       eventCount.toString(),
                                       'Events',
-                                      Icons.event_rounded,
                                     ),
                                   ],
                                 ),
@@ -93,7 +88,6 @@ class StatsBar extends StatelessWidget {
                                 _statItem(
                                   '₱${formatAmount(totalIncome)}',
                                   'Total Collected',
-                                  Icons.monetization_on_rounded,
                                 ),
                               ],
                             ),
@@ -108,11 +102,9 @@ class StatsBar extends StatelessWidget {
     );
   }
 
-  Widget _statItem(String value, String label, IconData icon) {
+  Widget _statItem(String value, String label) {
     return Column(
       children: [
-        Icon(icon, color: TraceColors.gold.withValues(alpha: 0.7), size: 18),
-        const SizedBox(height: 6),
         ShaderMask(
           shaderCallback: (b) => TraceColors.goldGradient.createShader(b),
           child: Text(

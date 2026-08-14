@@ -23,6 +23,13 @@ class Event {
   final String? afternoonTimeIn;
   final String? afternoonTimeOut;
 
+  // Accountability: sanctions for absentees
+  final double? sanctionAmount;        // monetary fine (₱) — null = no monetary sanction
+  final String? sanctionDescription;   // non-monetary (e.g. "2 hours community service") — null if using amount
+
+  // Per-event student obligation
+  final double? eventContribution;     // amount all students must contribute for this event
+
   Event({
     required this.id,
     required this.eventName,
@@ -42,7 +49,11 @@ class Event {
     this.morningTimeOut,
     this.afternoonTimeIn,
     this.afternoonTimeOut,
+    this.sanctionAmount,
+    this.sanctionDescription,
+    this.eventContribution,
   });
+
 
   factory Event.fromMap(Map<String, dynamic> data, String documentId) {
     return Event(
@@ -68,6 +79,9 @@ class Event {
       morningTimeOut: data['morning_time_out'],
       afternoonTimeIn: data['afternoon_time_in'],
       afternoonTimeOut: data['afternoon_time_out'],
+      sanctionAmount: (data['sanction_amount'] as num?)?.toDouble(),
+      sanctionDescription: data['sanction_description'],
+      eventContribution: (data['event_contribution'] as num?)?.toDouble(),
     );
   }
 
@@ -137,6 +151,9 @@ class Event {
       'morning_time_out': morningTimeOut,
       'afternoon_time_in': afternoonTimeIn,
       'afternoon_time_out': afternoonTimeOut,
+      'sanction_amount': sanctionAmount,
+      'sanction_description': sanctionDescription,
+      'event_contribution': eventContribution,
     };
   }
 }

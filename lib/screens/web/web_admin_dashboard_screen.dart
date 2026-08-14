@@ -14,6 +14,7 @@ import '../../services/auth_service.dart';
 import '../../services/event_service.dart';
 import '../../services/pdf_report_service.dart';
 import '../../services/student_service.dart';
+import '../../services/excel_report_service.dart';
 import '../../services/activity_log_service.dart';
 import '../../models/event.dart';
 import 'package:printing/printing.dart';
@@ -22,7 +23,9 @@ import '../admin/tabs/overview_tab.dart';
 import '../admin/tabs/events_tab.dart';
 import '../event_details_full_screen.dart';
 import '../admin/tabs/announcements_tab.dart';
-
+import '../admin/attendance_events_screen.dart';
+import '../../models/student.dart';
+import '../admin/student_financial_profile_screen.dart';
 class WebAdminDashboardScreen extends ConsumerStatefulWidget {
   const WebAdminDashboardScreen({super.key});
 
@@ -36,16 +39,56 @@ class _WebAdminDashboardScreenState
   int _selectedIndex = 0;
   String _fundSearchQuery = '';
   String _fundSortOption = 'Newest';
+  String _studentsSearchQuery = '';
+  bool _isExportingStudents = false;
 
-  final List<_NavItem> _navItems = [
-    _NavItem(Icons.dashboard_rounded, 'Dashboard'),
-    _NavItem(Icons.event_rounded, 'Events'),
-    _NavItem(Icons.qr_code_scanner_rounded, 'Scanner'),
-    _NavItem(Icons.campaign_rounded, 'Announcements'),
-    _NavItem(Icons.account_balance_wallet_rounded, 'Funds'),
-    _NavItem(Icons.people_rounded, 'Students'),
-    _NavItem(Icons.verified_user_rounded, 'ID Claims'),
-  ];
+  List<_NavItem> _getNavItems(String? role) {
+    if (role == 'scanner') {
+      return [
+        _NavItem(Icons.dashboard_rounded, 'Dashboard', 0),
+        _NavItem(Icons.event_rounded, 'Events', 1),
+        _NavItem(Icons.people_rounded, 'Students', 5),
+        _NavItem(Icons.qr_code_scanner_rounded, 'Scanner', 2),
+      ];
+    }
+    
+    if (role == 'pio') {
+      return [
+        _NavItem(Icons.dashboard_rounded, 'Dashboard', 0),
+        _NavItem(Icons.event_rounded, 'Events', 1),
+        _NavItem(Icons.campaign_rounded, 'Announcements', 3),
+        _NavItem(Icons.qr_code_scanner_rounded, 'Scanner', 2),
+      ];
+    }
+    
+    if (role == 'treasurer') {
+      return [
+        _NavItem(Icons.dashboard_rounded, 'Dashboard', 0),
+        _NavItem(Icons.account_balance_wallet_rounded, 'Funds', 4),
+        _NavItem(Icons.people_rounded, 'Students', 5),
+        _NavItem(Icons.qr_code_scanner_rounded, 'Scanner', 2),
+      ];
+    }
+    
+    if (role == 'auditor') {
+      return [
+        _NavItem(Icons.dashboard_rounded, 'Dashboard', 0),
+        _NavItem(Icons.account_balance_wallet_rounded, 'Funds', 4),
+        _NavItem(Icons.qr_code_scanner_rounded, 'Scanner', 2),
+      ];
+    }
+    
+    // admin and superadmin
+    return [
+      _NavItem(Icons.dashboard_rounded, 'Dashboard', 0),
+      _NavItem(Icons.event_rounded, 'Events', 1),
+      _NavItem(Icons.campaign_rounded, 'Announcements', 3),
+      _NavItem(Icons.account_balance_wallet_rounded, 'Funds', 4),
+      _NavItem(Icons.qr_code_scanner_rounded, 'Scanner', 2),
+      _NavItem(Icons.people_rounded, 'Students', 5),
+      _NavItem(Icons.verified_user_rounded, 'ID Claims', 6),
+    ];
+  }
 
   late final Stream<QuerySnapshot> _fundsStream;
 
@@ -67,12 +110,21 @@ class _WebAdminDashboardScreenState
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width > 900;
     final authService = ref.read(authServiceProvider);
+    
+    final role = ref.watch(adminRoleProvider).value;
+    final navItems = _getNavItems(role);
+    
+    if (navItems.isNotEmpty && _selectedIndex >= navItems.length) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _selectedIndex = 0);
+      });
+    }
 
     return Scaffold(
       backgroundColor: TraceColors.offWhite,
       body: Row(
         children: [
-          if (isWide) _buildSidebar(authService),
+          if (isWide) _buildSidebar(authService, navItems),
           Expanded(
             child: Column(
               children: [
@@ -139,25 +191,25 @@ class _WebAdminDashboardScreenState
                   ),
                 ),
                 // Content area
-                Expanded(child: _buildContent()),
+                Expanded(child: _buildContent(navItems)),
               ],
             ),
           ),
         ],
       ),
-      bottomNavigationBar: isWide ? null : _buildBottomNav(),
+      bottomNavigationBar: isWide ? null : _buildBottomNav(navItems),
     );
   }
 
-  Widget _buildSidebar(AuthService authService) {
+  Widget _buildSidebar(AuthService authService, List<_NavItem> navItems) {
     return Container(
       width: 240,
       color: TraceColors.navyBlue,
-      child: _buildSidebarContent(authService),
+      child: _buildSidebarContent(authService, navItems),
     );
   }
 
-  Widget _buildSidebarContent(AuthService authService) {
+  Widget _buildSidebarContent(AuthService authService, List<_NavItem> navItems) {
     return Column(
       children: [
         Container(
@@ -237,7 +289,7 @@ class _WebAdminDashboardScreenState
         Expanded(
           child: ListView(
             padding: const EdgeInsets.symmetric(vertical: 12),
-            children: _navItems.asMap().entries.map((e) {
+            children: navItems.asMap().entries.map((e) {
               final i = e.key;
               final item = e.value;
               final isSelected = _selectedIndex == i;
@@ -248,7 +300,7 @@ class _WebAdminDashboardScreenState
                   child: InkWell(
                     onTap: () {
                       setState(() => _selectedIndex = i);
-                      if (i == 2) context.go('/scanner');
+                      if (item.id == 2) context.go('/scanner');
                     },
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
@@ -302,17 +354,18 @@ class _WebAdminDashboardScreenState
     );
   }
 
-  Widget? _buildBottomNav() {
-    final items = _navItems.take(5).toList();
+  Widget? _buildBottomNav(List<_NavItem> navItems) {
+    final items = navItems.take(5).toList();
+    if (items.isEmpty) return null;
     return Container(
       color: TraceColors.navyBlue,
       padding: const EdgeInsets.only(top: 8, bottom: 5),
       child: BottomNavigationBar(
         elevation: 0,
-        currentIndex: _selectedIndex > 4 ? 0 : _selectedIndex,
+        currentIndex: _selectedIndex >= items.length ? 0 : _selectedIndex,
         onTap: (i) {
           setState(() => _selectedIndex = i);
-          if (i == 2) context.go('/scanner');
+          if (items[i].id == 2) context.go('/scanner');
         },
         type: BottomNavigationBarType.fixed,
         backgroundColor: TraceColors.navyBlue,
@@ -338,8 +391,15 @@ class _WebAdminDashboardScreenState
     );
   }
 
-  Widget _buildContent() {
-    switch (_selectedIndex) {
+  Widget _buildContent(List<_NavItem> navItems) {
+    if (navItems.isEmpty) return const SizedBox.shrink();
+    final role = ref.watch(adminRoleProvider).value;
+    int currentId = 0;
+    if (_selectedIndex < navItems.length) {
+      currentId = navItems[_selectedIndex].id;
+    }
+    
+    switch (currentId) {
       case 0:
         return OverviewTab(
           onNewEvent: _showEventDialog,
@@ -352,6 +412,7 @@ class _WebAdminDashboardScreenState
         return EventsTab(
           onEventTap: _showEventDetailsDialog,
           onNewEvent: _showEventDialog,
+          currentRole: role ?? 'admin',
         );
       case 3:
         return AnnouncementsTab(
@@ -363,6 +424,8 @@ class _WebAdminDashboardScreenState
         return _buildStudentsTab();
       case 6:
         return _buildIdClaimsTab();
+      case 7:
+        return const AttendanceEventsScreen();
       default:
         return OverviewTab(
           onNewEvent: _showEventDialog,
@@ -471,373 +534,12 @@ class _WebAdminDashboardScreenState
     );
   }
 
-  String? _formatTimeOfDay(TimeOfDay? t) {
-    if (t == null) return null;
-    return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-  }
 
-  TimeOfDay? _parseTimeOfDay(String? s) {
-    if (s == null || s.isEmpty || !s.contains(':')) return null;
-    final parts = s.split(':');
-    return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
-  }
 
   void _showEventDialog({Event? event}) {
-    final nameCtrl = TextEditingController(text: event?.eventName ?? '');
-    final descCtrl = TextEditingController(text: event?.description ?? '');
-    final venueCtrl = TextEditingController(text: event?.venue ?? '');
-    DateTime eventDate = event?.date ?? DateTime.now();
-    String coverImageBase64 = event?.bannerUrl ?? '';
-
-    // Base scheduled times
-    TimeOfDay? startTime = _parseTimeOfDay(event?.startTime);
-    TimeOfDay? endTime = _parseTimeOfDay(event?.endTime);
-
-    // Restored AM/PM times
-    TimeOfDay? mIn = _parseTimeOfDay(event?.morningTimeIn);
-    TimeOfDay? mOut = _parseTimeOfDay(event?.morningTimeOut);
-    TimeOfDay? aIn = _parseTimeOfDay(event?.afternoonTimeIn);
-    TimeOfDay? aOut = _parseTimeOfDay(event?.afternoonTimeOut);
-
-    String eventType = 'Whole Day';
-    if (event != null) {
-      if (event.isWholeDay) {
-        eventType = 'Whole Day';
-      } else if (event.isPmOnly) {
-        eventType = 'Afternoon';
-      } else if (event.isAmOnly) {
-        eventType = 'Morning';
-      }
-    }
-
-    String displayTime(TimeOfDay? t, BuildContext context) {
-      return t == null ? 'Not set' : t.format(context);
-    }
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDState) {
-          Widget timeTile(String label, TimeOfDay? val, VoidCallback onTap) =>
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(label, style: const TextStyle(fontSize: 13)),
-                subtitle: Text(
-                  displayTime(val, ctx),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-                trailing: const Icon(Icons.access_time, size: 20),
-                onTap: onTap,
-              );
-
-          return AlertDialog(
-            insetPadding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 24,
-            ),
-            title: Text(
-              event == null ? 'Create New Event' : 'Edit Event',
-              style: GoogleFonts.inter(
-                fontWeight: FontWeight.w700,
-                color: TraceColors.navyBlue,
-              ),
-            ),
-            content: SizedBox(
-              width: 400,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Cover image
-                    GestureDetector(
-                      onTap: () async {
-                        final picker = ImagePicker();
-                        final picked = await picker.pickImage(
-                          source: ImageSource.gallery,
-                          maxWidth: 800,
-                          imageQuality: 80,
-                        );
-                        if (picked != null) {
-                          final bytes = await picked.readAsBytes();
-                          final b64 = base64Encode(bytes);
-                          setDState(
-                            () => coverImageBase64 =
-                                'data:image/jpeg;base64,$b64',
-                          );
-                        }
-                      },
-                      child: Container(
-                        height: 120,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: TraceColors.lightGrey.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: TraceColors.gold.withValues(alpha: 0.5),
-                          ),
-                          image: coverImageBase64.isNotEmpty
-                              ? DecorationImage(
-                                  image: MemoryImage(
-                                    base64Decode(
-                                      coverImageBase64.split(',').last,
-                                    ),
-                                  ),
-                                  fit: BoxFit.cover,
-                                )
-                              : null,
-                        ),
-                        child: coverImageBase64.isEmpty
-                            ? Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.add_photo_alternate_rounded,
-                                    color: TraceColors.gold,
-                                    size: 32,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Upload Cover Image',
-                                    style: GoogleFonts.inter(
-                                      color: TraceColors.navyBlue,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: nameCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Event Name',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: descCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Agenda (Optional)',
-                      ),
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: venueCtrl,
-                      decoration: const InputDecoration(labelText: 'Venue'),
-                    ),
-                    const SizedBox(height: 12),
-                    // Date picker
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Event Date',
-                        style: TextStyle(fontSize: 14),
-                      ),
-                      subtitle: Text(
-                        DateFormat('MM/dd/yyyy').format(eventDate),
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      trailing: const Icon(Icons.calendar_today, size: 20),
-                      onTap: () async {
-                        final d = await showDatePicker(
-                          context: ctx,
-                          initialDate: eventDate,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2030),
-                        );
-                        if (d != null) setDState(() => eventDate = d);
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: timeTile('Overall Start', startTime, () async {
-                            final t = await showTimePicker(
-                              context: ctx,
-                              initialTime:
-                                  startTime ??
-                                  const TimeOfDay(hour: 8, minute: 0),
-                            );
-                            if (t != null) setDState(() => startTime = t);
-                          }),
-                        ),
-                        Expanded(
-                          child: timeTile('Overall End', endTime, () async {
-                            final t = await showTimePicker(
-                              context: ctx,
-                              initialTime:
-                                  endTime ??
-                                  const TimeOfDay(hour: 17, minute: 0),
-                            );
-                            if (t != null) setDState(() => endTime = t);
-                          }),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    const Divider(),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      initialValue: eventType,
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'Whole Day',
-                          child: Text('Whole Day Event'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Morning',
-                          child: Text('Morning Only'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Afternoon',
-                          child: Text('Afternoon Only'),
-                        ),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) setDState(() => eventType = val);
-                      },
-                      decoration: const InputDecoration(
-                        labelText: 'Event Type',
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    if (eventType == 'Whole Day' || eventType == 'Morning') ...[
-                      Text(
-                        'Morning Session',
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.bold,
-                          color: TraceColors.navyBlue,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: timeTile('Morning In', mIn, () async {
-                              final t = await showTimePicker(
-                                context: ctx,
-                                initialTime:
-                                    mIn ?? const TimeOfDay(hour: 8, minute: 0),
-                              );
-                              if (t != null) setDState(() => mIn = t);
-                            }),
-                          ),
-                          Expanded(
-                            child: timeTile('Morning Out', mOut, () async {
-                              final t = await showTimePicker(
-                                context: ctx,
-                                initialTime:
-                                    mOut ??
-                                    const TimeOfDay(hour: 12, minute: 0),
-                              );
-                              if (t != null) setDState(() => mOut = t);
-                            }),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    if (eventType == 'Whole Day' ||
-                        eventType == 'Afternoon') ...[
-                      Text(
-                        'Afternoon Session',
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.bold,
-                          color: TraceColors.navyBlue,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: timeTile('Afternoon In', aIn, () async {
-                              final t = await showTimePicker(
-                                context: ctx,
-                                initialTime:
-                                    aIn ?? const TimeOfDay(hour: 13, minute: 0),
-                              );
-                              if (t != null) setDState(() => aIn = t);
-                            }),
-                          ),
-                          Expanded(
-                            child: timeTile('Afternoon Out', aOut, () async {
-                              final t = await showTimePicker(
-                                context: ctx,
-                                initialTime:
-                                    aOut ??
-                                    const TimeOfDay(hour: 17, minute: 0),
-                              );
-                              if (t != null) setDState(() => aOut = t);
-                            }),
-                          ),
-                        ],
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                  ],
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel'),
-              ),
-              GoldButton(
-                label: event == null ? 'Create' : 'Save',
-                onPressed: () async {
-                  if (nameCtrl.text.trim().isEmpty) return;
-                  final data = {
-                    'event_name': nameCtrl.text.trim(),
-                    'description': descCtrl.text.trim(),
-                    'venue': venueCtrl.text.trim(),
-                    'date': eventDate,
-                    'start_time': _formatTimeOfDay(startTime),
-                    'end_time': _formatTimeOfDay(endTime),
-                    'is_whole_day': eventType == 'Whole Day',
-                    'is_pm_only': eventType == 'Afternoon',
-                    'is_am_only': eventType == 'Morning',
-                    'morning_time_in':
-                        (eventType == 'Whole Day' || eventType == 'Morning')
-                        ? _formatTimeOfDay(mIn)
-                        : null,
-                    'morning_time_out':
-                        (eventType == 'Whole Day' || eventType == 'Morning')
-                        ? _formatTimeOfDay(mOut)
-                        : null,
-                    'afternoon_time_in':
-                        (eventType == 'Whole Day' || eventType == 'Afternoon')
-                        ? _formatTimeOfDay(aIn)
-                        : null,
-                    'afternoon_time_out':
-                        (eventType == 'Whole Day' || eventType == 'Afternoon')
-                        ? _formatTimeOfDay(aOut)
-                        : null,
-                    'banner_url': coverImageBase64,
-                    'status': event?.status ?? 'upcoming',
-                  };
-                  if (event == null) {
-                    await EventService.createEvent(data);
-                  } else {
-                    await EventService.updateEvent(event.id, data);
-                  }
-                  if (!ctx.mounted) return;
-                  Navigator.pop(ctx);
-                },
-              ),
-            ],
-          );
-        },
-      ),
-    );
+    context.push('/admin/event-form', extra: event);
   }
+
 
   void _showEventDetailsDialog(Event event) {
     Navigator.push(
@@ -2466,17 +2168,64 @@ class _WebAdminDashboardScreenState
   }
 
   Widget _buildStudentsTab() {
-    return Padding(
-      padding: const EdgeInsets.all(24),
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Registered Students',
-            style: GoogleFonts.inter(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: TraceColors.navyBlue,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Registered Students',
+                style: GoogleFonts.inter(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: TraceColors.navyBlue,
+                ),
+              ),
+              _isExportingStudents
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(color: TraceColors.gold, strokeWidth: 2),
+                    )
+                  : ElevatedButton.icon(
+                      icon: const Icon(Icons.download_rounded, size: 18),
+                      label: const Text('Export Excel'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: TraceColors.gold,
+                        foregroundColor: TraceColors.navyBlue,
+                        elevation: 0,
+                      ),
+                      onPressed: _exportStudentsToExcel,
+                    ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            onChanged: (val) {
+              setState(() {
+                _studentsSearchQuery = val.toLowerCase();
+              });
+            },
+            decoration: InputDecoration(
+              hintText: 'Search student name or ID...',
+              prefixIcon: const Icon(Icons.search, color: TraceColors.medGrey),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.grey),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.grey),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: TraceColors.royalBlue),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
           ),
           const SizedBox(height: 16),
@@ -2489,7 +2238,15 @@ class _WebAdminDashboardScreenState
               if (!snap.hasData) {
                 return const Center(child: CircularProgressIndicator());
               }
-              final docs = snap.data!.docs;
+              var docs = snap.data!.docs;
+              if (_studentsSearchQuery.isNotEmpty) {
+                docs = docs.where((d) {
+                  final data = d.data() as Map<String, dynamic>;
+                  final name = (data['name'] as String? ?? '').toLowerCase();
+                  final sId = (data['student_id'] as String? ?? '').toLowerCase();
+                  return name.contains(_studentsSearchQuery) || sId.contains(_studentsSearchQuery);
+                }).toList();
+              }
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -2503,36 +2260,54 @@ class _WebAdminDashboardScreenState
                   const SizedBox(height: 12),
                   ...docs.map((d) {
                     final data = d.data() as Map<String, dynamic>;
+                    final student = Student.fromMap(data, d.id);
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: TraceCard(
-                        padding: const EdgeInsets.all(14),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    TraceColors.royalBlue,
-                                    TraceColors.midBlue,
-                                  ],
-                                ),
-                                shape: BoxShape.circle,
+                        padding: EdgeInsets.zero,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () {
+                            Navigator.push(context, MaterialPageRoute(
+                              builder: (ctx) => StudentFinancialProfileScreen(
+                                student: student,
+                                currentUserEmail: ref.read(authServiceProvider).currentUser?.email ?? '',
                               ),
-                              child: Center(
-                                child: Text(
-                                  (data['name'] as String? ?? '?').isNotEmpty
-                                      ? (data['name'] as String)[0]
-                                      : '?',
-                                  style: GoogleFonts.inter(
-                                    color: TraceColors.gold,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
+                            ));
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Row(
+                              children: [
+                            Builder(
+                              builder: (context) {
+                                final avatarUrl = (data['avatar_url'] ?? '').toString();
+                                ImageProvider? imageProvider;
+                                if (avatarUrl.isNotEmpty) {
+                                  if (avatarUrl.startsWith('data:image')) {
+                                    imageProvider = MemoryImage(base64Decode(avatarUrl.split(',').last));
+                                  } else if (avatarUrl.startsWith('http')) {
+                                    imageProvider = NetworkImage(avatarUrl);
+                                  }
+                                }
+                                return CircleAvatar(
+                                  radius: 21,
+                                  backgroundColor: TraceColors.royalBlue,
+                                  backgroundImage: imageProvider,
+                                  child: imageProvider == null
+                                      ? Text(
+                                          (data['name'] as String? ?? '?').isNotEmpty
+                                              ? (data['name'] as String? ?? '?')[0].toUpperCase()
+                                              : '?',
+                                          style: GoogleFonts.inter(
+                                            color: TraceColors.gold,
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 16,
+                                          ),
+                                        )
+                                      : null,
+                                );
+                              }
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -2560,7 +2335,9 @@ class _WebAdminDashboardScreenState
                           ],
                         ),
                       ),
-                    );
+                    ),
+                  ),
+                );
                   }),
                 ],
               );
@@ -2568,7 +2345,7 @@ class _WebAdminDashboardScreenState
           ),
         ],
       ),
-    );
+    ));
   }
 
   String _formatAmount(double amount) {
@@ -2596,12 +2373,46 @@ class _WebAdminDashboardScreenState
       ),
     );
   }
+
+  Future<void> _exportStudentsToExcel() async {
+    setState(() => _isExportingStudents = true);
+    try {
+      final snap = await FirestoreService.db.collection('students').get();
+      final activeDocs = snap.docs.where((doc) {
+        final data = doc.data();
+        return data['is_archived'] != true;
+      }).toList();
+      
+      await ExcelReportService.generateStudentsExcelByYear(activeDocs);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Excel report generated successfully.'),
+            backgroundColor: TraceColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error generating report: $e'),
+            backgroundColor: TraceColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExportingStudents = false);
+    }
+  }
 }
 
 class _NavItem {
   final IconData icon;
   final String label;
-  _NavItem(this.icon, this.label);
+  final int id;
+  _NavItem(this.icon, this.label, this.id);
 }
 
 // ===========================================================================

@@ -122,29 +122,8 @@ class _WebAdminLoginScreenState extends ConsumerState<WebAdminLoginScreen>
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // TRACE Logo
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: TraceColors.gold,
-                              width: 2,
-                            ),
-                            color: TraceColors.gold.withValues(alpha: 0.1),
-                          ),
-                          child: ShaderMask(
-                            shaderCallback: (b) =>
-                                TraceColors.goldGradient.createShader(b),
-                            child: const Icon(
-                              Icons.shield_rounded,
-                              size: 44,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Image.asset('assets/trace-logo3.png', height: 64),
+                        // IITSO Logo
+                        Image.asset('assets/iitso-logo.png', height: 120),
                         const SizedBox(height: 4),
                         Text(
                           'Officer Administration Portal',
