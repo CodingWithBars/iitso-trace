@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
 import '../services/attendance_service.dart';
 import '../services/event_service.dart';
+import '../services/offline_cache_service.dart';
 import '../models/event.dart';
 import '../models/student.dart';
 import '../services/network_service.dart';
@@ -41,6 +42,8 @@ class _ScannerScreenState extends State<ScannerScreen>
   List<Event> _activeEvents = [];
   bool _loadingEvents = true;
   ScanPhase _manualPhase = ScanPhase.timeInAm;
+  DateTime? _lastSyncTime;   // tracks when offline data was last downloaded
+  bool _autoDownloading = false; // prevents duplicate auto-download
 
   @override
   void initState() {
@@ -55,6 +58,8 @@ class _ScannerScreenState extends State<ScannerScreen>
     );
     _syncTime();
     _loadEvents();
+    // Try loading previously-cached offline data immediately
+    _tryLoadCachedData();
   }
 
   Future<void> _syncTime() async {
@@ -63,6 +68,32 @@ class _ScannerScreenState extends State<ScannerScreen>
       final ntpTime = await NTP.now();
       _ntpOffset = ntpTime.difference(DateTime.now());
     } catch (_) {}
+  }
+
+  /// Auto-loads cached offline data for the currently-selected event.
+  /// Called on initState so data is available the moment the scanner opens,
+  /// even before internet is confirmed.
+  Future<void> _tryLoadCachedData() async {
+    // Wait until _selectedEvent is populated (may be null on first call)
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (!mounted || _selectedEvent == null) return;
+    await _loadCachedDataForEvent(_selectedEvent!.id);
+  }
+
+  Future<void> _loadCachedDataForEvent(String eventId) async {
+    final cache = await OfflineCacheService.getOfflineScannerData(eventId);
+    if (cache == null) return;
+    final syncTime = await OfflineCacheService.getLastSyncTime(eventId);
+    if (!mounted) return;
+    setState(() {
+      _offlineStudents = cache.students;
+      _offlineAttendance = cache.attendance;
+      _lastSyncTime = syncTime;
+      // Only activate offline mode if we're actually offline
+      if (NetworkService().isOffline) {
+        _isOfflineMode = true;
+      }
+    });
   }
 
   DateTime get _networkNow => DateTime.now().add(_ntpOffset);
@@ -152,8 +183,51 @@ class _ScannerScreenState extends State<ScannerScreen>
       }
       // Auto-select the correct phase based on current time
       _autoDetectPhase();
+
+      // Auto-download offline data in the background when online,
+      // so it's cached and ready before the internet drops.
+      if (!NetworkService().isOffline && !_autoDownloading) {
+        _autoDownloadInBackground();
+      }
     } else {
       setState(() => _selectedEvent = null);
+    }
+  }
+
+  /// Silently downloads offline data in the background (no UI spinners).
+  /// Only runs once per scanner session.
+  Future<void> _autoDownloadInBackground() async {
+    if (_selectedEvent == null || _autoDownloading) return;
+    _autoDownloading = true;
+    try {
+      final stSnap = await FirestoreService.students.get();
+      final atSnap = await FirestoreService.attendance
+          .where('event_id', isEqualTo: _selectedEvent!.id)
+          .get();
+
+      final students = stSnap.docs
+          .map((d) => Student.fromMap(d.data() as Map<String, dynamic>, d.id))
+          .toList();
+      final attendance = {
+        for (var d in atSnap.docs) d.id: d.data() as Map<String, dynamic>,
+      };
+
+      // Persist to local cache
+      await OfflineCacheService.saveOfflineScannerData(
+        eventId: _selectedEvent!.id,
+        students: students,
+        attendance: attendance,
+      );
+      final syncTime = await OfflineCacheService.getLastSyncTime(_selectedEvent!.id);
+
+      if (!mounted) return;
+      setState(() {
+        _offlineStudents = students;
+        _offlineAttendance = attendance;
+        _lastSyncTime = syncTime;
+      });
+    } catch (e) {
+      debugPrint('Auto-download offline data failed: $e');
     }
   }
 
@@ -229,15 +303,27 @@ class _ScannerScreenState extends State<ScannerScreen>
         for (var d in atSnap.docs) d.id: d.data() as Map<String, dynamic>,
       };
 
+      // Persist to local storage so data survives app restarts
+      await OfflineCacheService.saveOfflineScannerData(
+        eventId: _selectedEvent!.id,
+        students: st,
+        attendance: at,
+      );
+      final syncTime = await OfflineCacheService.getLastSyncTime(_selectedEvent!.id);
+
       setState(() {
         _offlineStudents = st;
         _offlineAttendance = at;
         _isOfflineMode = true;
+        _lastSyncTime = syncTime;
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Offline data downloaded. Offline Mode ON.'),
+          SnackBar(
+            content: Text(
+              'Offline data downloaded (${st.length} students). Offline Mode ON.',
+            ),
+            backgroundColor: Colors.green.shade700,
           ),
         );
       }
@@ -558,22 +644,7 @@ class _ScannerScreenState extends State<ScannerScreen>
             child: Column(
               children: [
                 if (NetworkService().isOffline || _isOfflineMode)
-                  Container(
-                    width: double.infinity,
-                    color: Colors.amber.shade200,
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Text(
-                      _isOfflineMode
-                          ? '⚡ OFFLINE MODE ACTIVE'
-                          : '⚡ NO NETWORK DETECTED',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ),
+                  _buildOfflineBanner(),
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -614,13 +685,22 @@ class _ScannerScreenState extends State<ScannerScreen>
                                 icon: Icon(
                                   _isOfflineMode
                                       ? Icons.cloud_off
-                                      : Icons.cloud_download,
+                                      : (_lastSyncTime != null
+                                          ? Icons.cloud_done
+                                          : Icons.cloud_download),
                                   color: _isOfflineMode
                                       ? Colors.greenAccent
-                                      : Colors.white,
+                                      : (_lastSyncTime != null
+                                          ? Colors.lightGreenAccent
+                                          : Colors.white),
                                 ),
-                                onPressed: _isOfflineMode
-                                    ? null
+                                tooltip: _isOfflineMode
+                                    ? 'Offline Mode Active — tap to re-sync'
+                                    : (_lastSyncTime != null
+                                        ? 'Data cached — tap to re-sync'
+                                        : 'Download offline data'),
+                                onPressed: NetworkService().isOffline
+                                    ? null  // no internet, can't download
                                     : _downloadOfflineData,
                               ),
                               IconButton(
@@ -934,6 +1014,57 @@ class _ScannerScreenState extends State<ScannerScreen>
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  /// Rich offline status banner shown at top of scanner when offline or cached data is loaded.
+  Widget _buildOfflineBanner() {
+    final bool isHardOffline = NetworkService().isOffline;
+    final bool hasCachedData = _offlineStudents != null;
+
+    final Color bannerColor = isHardOffline
+        ? Colors.red.shade700
+        : (_isOfflineMode ? Colors.orange.shade700 : Colors.amber.shade700);
+
+    final String modeLabel = isHardOffline
+        ? '⚡ NO NETWORK'
+        : (_isOfflineMode ? '⚡ OFFLINE MODE' : '⚡ CACHED DATA READY');
+
+    final String syncLabel = _lastSyncTime != null
+        ? OfflineCacheService.syncAgoLabel(_lastSyncTime!)
+        : (hasCachedData ? 'data loaded' : 'no cache');
+
+    return Container(
+      width: double.infinity,
+      color: bannerColor,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '$modeLabel  •  $syncLabel',
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          if (!isHardOffline && !_isOfflineMode && hasCachedData)
+            GestureDetector(
+              onTap: _downloadOfflineData,
+              child: Text(
+                'Re-sync',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
         ],
       ),
     );

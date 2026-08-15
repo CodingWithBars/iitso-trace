@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/splash_gif_widget.dart';
+import '../services/student_session_service.dart';
+import '../services/student_service.dart';
+import '../services/offline_cache_service.dart';
+import '../services/network_service.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   final String? targetPath;
@@ -74,8 +78,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       // ── Step 4b: Start fade-in animation
       _fadeInController.forward();
 
-      // ── Step 5: Preload landing screen assets in background during splash
+      // ── Step 5: Preload landing screen assets AND prewarm student profile cache
       _preloadLandingAssets();
+      _prewarmStudentCache();
 
       // ── Step 6: Hold for 2.8 seconds then trigger smooth fade-out exit
       _timer = Timer(const Duration(milliseconds: 2800), _startExitSequence);
@@ -97,6 +102,30 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       precacheImage(AssetImage(asset), context).catchError((_) {
         // Silently ignore missing optional assets
       });
+    }
+  }
+
+  /// Refreshes the student's cached profile from Firestore while the
+  /// splash is showing (online only). This keeps the offline-login cache
+  /// up-to-date on every normal app launch without blocking the UI.
+  Future<void> _prewarmStudentCache() async {
+    if (NetworkService().isOffline) return;
+    try {
+      // Read the persisted studentId from SharedPreferences via Riverpod
+      final studentId = await ref.read(studentSessionProvider.future);
+      if (studentId == null || studentId.isEmpty) return;
+
+      final student = await StudentService.getStudentByStudentId(studentId);
+      if (student == null) return;
+
+      // Re-read the cached pin_hash (we don't re-fetch it from Firestore
+      // to avoid exposing hashes unnecessarily — the cached one is still valid).
+      final cached = await OfflineCacheService.getStudentProfile(studentId);
+      final pinHash = cached?['pin_hash'] as String? ?? '';
+
+      await OfflineCacheService.saveStudentProfile(student, pinHash);
+    } catch (e) {
+      // Non-fatal — offline cache prewarm is best-effort
     }
   }
 

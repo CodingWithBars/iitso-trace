@@ -8,6 +8,7 @@ import '../models/attendance.dart';
 import 'auth_service.dart';
 import 'activity_log_service.dart';
 import 'notification_service.dart';
+import 'offline_cache_service.dart';
 import 'dart:convert';
 
 class StudentService {
@@ -118,6 +119,9 @@ class StudentService {
   /// Login with Student ID + email + PIN.
   /// For legacy accounts (no pin_hash stored), allows login without PIN
   /// and prompts them to set one after first login.
+  ///
+  /// If Firestore is unreachable (offline / slow network), falls back to the
+  /// locally-cached profile stored in [OfflineCacheService].
   static Future<StudentLoginResult> studentLogin(
     String studentId,
     String email,
@@ -129,7 +133,12 @@ class StudentService {
           .where('email', isEqualTo: email)
           .limit(1)
           .get();
-      if (snap.docs.isEmpty) return StudentLoginResult.notFound();
+
+      if (snap.docs.isEmpty) {
+        // Firestore returned empty — could be offline (cache miss) or genuinely
+        // not found. Try the local cache as a fallback.
+        return _offlineLoginFallback(studentId, email, pin);
+      }
 
       final data = snap.docs.first.data() as Map<String, dynamic>;
       final storedHash = data['pin_hash'] as String?;
@@ -147,10 +156,45 @@ class StudentService {
 
       return StudentLoginResult.success(
         Student.fromMap(data, snap.docs.first.id),
+        pinHash: storedHash,
       );
     } catch (e) {
+      // Network / permission error — attempt offline fallback
+      debugPrint('StudentService.studentLogin online attempt failed: $e');
+      return _offlineLoginFallback(studentId, email, pin);
+    }
+  }
+
+  /// Verifies credentials against the locally-cached student profile.
+  /// Called when Firestore is unreachable.
+  static Future<StudentLoginResult> _offlineLoginFallback(
+    String studentId,
+    String email,
+    String pin,
+  ) async {
+    final cached = await OfflineCacheService.getStudentProfile(studentId);
+    if (cached == null) return StudentLoginResult.notFound();
+
+    // Verify email matches
+    final cachedEmail = (cached['email'] as String? ?? '').toLowerCase().trim();
+    if (cachedEmail != email.toLowerCase().trim()) {
       return StudentLoginResult.notFound();
     }
+
+    final storedHash = cached['pin_hash'] as String?;
+
+    // Legacy account cached with no PIN
+    if (storedHash == null || storedHash.isEmpty) {
+      final student = Student.fromMap(cached, cached['id'] as String? ?? '');
+      return StudentLoginResult.needsPinSetup(student);
+    }
+
+    if (hashPin(pin) != storedHash) {
+      return StudentLoginResult.wrongPin();
+    }
+
+    final student = Student.fromMap(cached, cached['id'] as String? ?? '');
+    return StudentLoginResult.success(student, pinHash: storedHash, isOffline: true);
   }
 
   static Future<Student?> getStudentByStudentId(String studentId) async {
@@ -543,11 +587,17 @@ enum LoginStatus { success, notFound, wrongPin, needsPinSetup }
 class StudentLoginResult {
   final LoginStatus status;
   final Student? student;
+  /// The raw SHA-256 pin_hash string, forwarded to [OfflineCacheService] on
+  /// success so we can cache it without re-hashing.
+  final String? pinHash;
+  /// True when the result came from local cache (no Firestore connection).
+  final bool isOffline;
 
-  const StudentLoginResult._({required this.status, this.student});
+  const StudentLoginResult._(
+    {required this.status, this.student, this.pinHash, this.isOffline = false});
 
-  factory StudentLoginResult.success(Student s) =>
-      StudentLoginResult._(status: LoginStatus.success, student: s);
+  factory StudentLoginResult.success(Student s, {String? pinHash, bool isOffline = false}) =>
+      StudentLoginResult._(status: LoginStatus.success, student: s, pinHash: pinHash, isOffline: isOffline);
 
   factory StudentLoginResult.needsPinSetup(Student s) =>
       StudentLoginResult._(status: LoginStatus.needsPinSetup, student: s);

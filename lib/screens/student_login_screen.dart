@@ -69,8 +69,23 @@ class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen> {
           case LoginStatus.success:
             await ref
                 .read(studentSessionProvider.notifier)
-                .login(result.student!.studentId);
+                .login(
+                  result.student!.studentId,
+                  student: result.student,
+                  pinHash: result.pinHash,
+                );
             if (!mounted) return;
+            if (result.isOffline) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    '✓ Logged in using cached data (offline mode)',
+                  ),
+                  backgroundColor: Colors.orange,
+                  duration: Duration(seconds: 3),
+                ),
+              );
+            }
             context.push('/student/id/${result.student!.studentId}');
 
           case LoginStatus.needsPinSetup:
@@ -194,7 +209,13 @@ class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('PIN set successfully! Logging in...'), backgroundColor: TraceColors.success),
                     );
-                    await ref.read(studentSessionProvider.notifier).login(studentId);
+                    // Fetch freshly-set student to cache for offline use
+                    final updatedStudent = await StudentService.getStudentByStudentId(studentId);
+                    await ref.read(studentSessionProvider.notifier).login(
+                      studentId,
+                      student: updatedStudent,
+                      pinHash: StudentService.hashPin(pin),
+                    );
                     if (mounted) context.push('/student/id/$studentId');
                   }
                 },
