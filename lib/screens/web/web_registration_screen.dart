@@ -41,6 +41,7 @@ class _WebRegistrationScreenState extends ConsumerState<WebRegistrationScreen> {
     '4th Year',
   ];
   String? _selectedYear;
+  String? _selectedSection;
 
   bool _isSplashVisible = true;
   bool _isSplashRendered = true;
@@ -191,6 +192,7 @@ class _WebRegistrationScreenState extends ConsumerState<WebRegistrationScreen> {
         name: _nameController.text.trim(),
         course: _selectedProgram ?? '',
         yearLevel: _selectedYear ?? '',
+        section: _selectedSection ?? '',
         email: _emailController.text.trim(),
         avatarUrl: avatarUrl,
         pin: _pinController.text.trim(),
@@ -447,20 +449,46 @@ class _WebRegistrationScreenState extends ConsumerState<WebRegistrationScreen> {
                             v == null ? 'Program is required' : null,
                       ),
                       const SizedBox(height: 16),
-                      DropdownButtonFormField<String>(
-                        initialValue: _selectedYear,
-                        decoration: const InputDecoration(
-                          labelText: 'Year Level',
-                          prefixIcon: Icon(Icons.grade_outlined),
-                        ),
-                        items: _yearLevels
-                            .map(
-                              (y) => DropdownMenuItem(value: y, child: Text(y)),
-                            )
-                            .toList(),
-                        onChanged: (v) => setState(() => _selectedYear = v),
-                        validator: (v) =>
-                            v == null ? 'Year level is required' : null,
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 5,
+                            child: DropdownButtonFormField<String>(
+                              initialValue: _selectedYear,
+                              decoration: const InputDecoration(
+                                labelText: 'Year Level',
+                                prefixIcon: Icon(Icons.grade_outlined),
+                              ),
+                              items: _yearLevels
+                                  .map(
+                                    (y) => DropdownMenuItem(value: y, child: Text(y)),
+                                  )
+                                  .toList(),
+                              onChanged: (v) => setState(() => _selectedYear = v),
+                              validator: (v) =>
+                                  v == null ? 'Required' : null,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            flex: 3,
+                            child: DropdownButtonFormField<String>(
+                              initialValue: _selectedSection,
+                              decoration: const InputDecoration(
+                                labelText: 'Section',
+                              ),
+                              items: ['A', 'B', 'C']
+                                  .map(
+                                    (s) => DropdownMenuItem(value: s, child: Text(s)),
+                                  )
+                                  .toList(),
+                              onChanged: (v) => setState(() => _selectedSection = v),
+                              validator: (v) =>
+                                  v == null ? 'Required' : null,
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 16),
                       TextFormField(

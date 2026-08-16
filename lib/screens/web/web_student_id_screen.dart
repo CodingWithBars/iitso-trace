@@ -192,7 +192,7 @@ class _WebStudentIdScreenState extends ConsumerState<WebStudentIdScreen> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          '${_student!.course} - ${_student!.yearLevel}',
+                          '${_student!.course} - ${_student!.yearLevel}${_student!.section.isNotEmpty ? ' - Sec ${_student!.section}' : ''}',
                           style: GoogleFonts.inter(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -355,6 +355,7 @@ class _EditProfileSheet extends StatefulWidget {
 
 class _EditProfileSheetState extends State<_EditProfileSheet> {
   late TextEditingController _nameCtrl;
+  String? _selectedSection;
   Uint8List? _pickedBytes;
   String? _pickedBase64;
   bool _isSaving = false;
@@ -364,6 +365,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.student.name);
+    _selectedSection = widget.student.section.isNotEmpty ? widget.student.section : null;
   }
 
   @override
@@ -409,6 +411,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
         docId: widget.student.id,
         name: name,
         avatarUrl: newAvatarUrl,
+        section: _selectedSection,
       );
       final updated = Student(
         id: widget.student.id,
@@ -416,6 +419,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
         name: name,
         course: widget.student.course,
         yearLevel: widget.student.yearLevel,
+        section: _selectedSection ?? widget.student.section,
         qrHash: widget.student.qrHash,
         email: widget.student.email,
         avatarUrl: newAvatarUrl ?? widget.student.avatarUrl,
@@ -506,20 +510,67 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
             style: GoogleFonts.inter(fontSize: 15, color: TraceColors.navyBlue),
           ),
           const SizedBox(height: 16),
-          Text('Student ID', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: TraceColors.medGrey)),
-          const SizedBox(height: 6),
-          TextField(
-            controller: TextEditingController(text: widget.student.studentId),
-            enabled: false,
-            decoration: InputDecoration(
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: TraceColors.lightGrey.withValues(alpha: 0.5))),
-              fillColor: TraceColors.lightGrey.withValues(alpha: 0.1),
-              filled: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              suffixIcon: const Icon(Icons.lock_outline, color: TraceColors.medGrey, size: 18),
-            ),
-            style: GoogleFonts.inter(fontSize: 15, color: TraceColors.medGrey),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 5,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Student ID', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: TraceColors.medGrey)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: TextEditingController(text: widget.student.studentId),
+                      enabled: false,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: TraceColors.lightGrey.withValues(alpha: 0.5))),
+                        fillColor: TraceColors.lightGrey.withValues(alpha: 0.1),
+                        filled: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        suffixIcon: const Icon(Icons.lock_outline, color: TraceColors.medGrey, size: 18),
+                      ),
+                      style: GoogleFonts.inter(fontSize: 15, color: TraceColors.medGrey),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Section', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: TraceColors.medGrey)),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedSection,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: TraceColors.navyBlue,
+                            width: 2,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                      items: ['A', 'B', 'C']
+                          .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                          .toList(),
+                      onChanged: (v) => setState(() => _selectedSection = v),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           if (_generalError != null) ...[
             const SizedBox(height: 8),

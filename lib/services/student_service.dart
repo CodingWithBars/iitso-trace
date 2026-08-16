@@ -9,6 +9,7 @@ import 'auth_service.dart';
 import 'activity_log_service.dart';
 import 'notification_service.dart';
 import 'offline_cache_service.dart';
+import 'network_service.dart';
 import 'dart:convert';
 
 class StudentService {
@@ -23,6 +24,7 @@ class StudentService {
     required String name,
     required String course,
     required String yearLevel,
+    required String section,
     required String email,
     String? avatarUrl,
     required String pin, // 4–6 digit PIN, stored as SHA-256 hash
@@ -44,6 +46,7 @@ class StudentService {
         'name': name,
         'course': course,
         'year_level': yearLevel,
+        'section': section,
         'email': email,
         'avatar_url': avatarUrl ?? '',
         'qr_hash': qrHash,
@@ -120,8 +123,8 @@ class StudentService {
   /// For legacy accounts (no pin_hash stored), allows login without PIN
   /// and prompts them to set one after first login.
   ///
-  /// If Firestore is unreachable (offline / slow network), falls back to the
-  /// locally-cached profile stored in [OfflineCacheService].
+  /// If the device is truly offline and Firestore cannot serve the query,
+  /// falls back to the locally-cached profile in [OfflineCacheService].
   static Future<StudentLoginResult> studentLogin(
     String studentId,
     String email,
@@ -135,9 +138,13 @@ class StudentService {
           .get();
 
       if (snap.docs.isEmpty) {
-        // Firestore returned empty — could be offline (cache miss) or genuinely
-        // not found. Try the local cache as a fallback.
-        return _offlineLoginFallback(studentId, email, pin);
+        // If we're genuinely offline, the empty result could be a cache miss —
+        // try the local profile cache before saying "not found".
+        // If we're online, empty means wrong credentials (truly not found).
+        if (NetworkService().isOffline) {
+          return _offlineLoginFallback(studentId, email, pin);
+        }
+        return StudentLoginResult.notFound();
       }
 
       final data = snap.docs.first.data() as Map<String, dynamic>;
@@ -292,9 +299,11 @@ class StudentService {
     required String docId,
     required String name,
     String? avatarUrl,
+    String? section,
   }) async {
     final data = <String, dynamic>{'name': name};
     if (avatarUrl != null) data['avatar_url'] = avatarUrl;
+    if (section != null) data['section'] = section;
     await FirestoreService.students.doc(docId).update(data);
     await ActivityLogService.log(
       action: 'profile_updated',

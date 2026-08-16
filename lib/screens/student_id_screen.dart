@@ -192,7 +192,7 @@ class _StudentIdScreenState extends ConsumerState<StudentIdScreen> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          '${_student!.course} - ${_student!.yearLevel}',
+                          '${_student!.course} - ${_student!.yearLevel}${_student!.section.isNotEmpty ? ' - Sec ${_student!.section}' : ''}',
                           style: GoogleFonts.inter(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -364,6 +364,7 @@ class _EditProfileSheet extends StatefulWidget {
 
 class _EditProfileSheetState extends State<_EditProfileSheet> {
   late TextEditingController _nameCtrl;
+  String? _selectedSection;
   Uint8List? _pickedBytes;
   bool _isSaving = false;
   String? _generalError;
@@ -372,6 +373,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.student.name);
+    _selectedSection = widget.student.section.isNotEmpty ? widget.student.section : null;
   }
 
   @override
@@ -414,6 +416,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
         docId: widget.student.id,
         name: name,
         avatarUrl: newAvatarUrl,
+        section: _selectedSection,
       );
       final updated = Student(
         id: widget.student.id,
@@ -421,6 +424,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
         name: name,
         course: widget.student.course,
         yearLevel: widget.student.yearLevel,
+        section: _selectedSection ?? widget.student.section,
         qrHash: widget.student.qrHash,
         email: widget.student.email,
         avatarUrl: newAvatarUrl ?? widget.student.avatarUrl,
@@ -572,51 +576,87 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
           ),
           const SizedBox(height: 16),
 
-          // Student ID is locked — displayed read-only
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: TraceColors.offWhite,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: TraceColors.lightGrey),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.badge_outlined,
-                  color: TraceColors.medGrey,
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          // Student ID is locked — displayed read-only (with Section beside it)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 5,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: TraceColors.offWhite,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: TraceColors.lightGrey),
+                  ),
+                  child: Row(
                     children: [
-                      Text(
-                        'Student ID',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: TraceColors.medGrey,
+                      const Icon(
+                        Icons.badge_outlined,
+                        color: TraceColors.medGrey,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Student ID',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: TraceColors.medGrey,
+                              ),
+                            ),
+                            Text(
+                              widget.student.studentId,
+                              style: GoogleFonts.inter(
+                                fontSize: 15,
+                                color: TraceColors.navyBlue,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      Text(
-                        widget.student.studentId,
-                        style: GoogleFonts.inter(
-                          fontSize: 15,
-                          color: TraceColors.navyBlue,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      const Icon(
+                        Icons.lock_rounded,
+                        color: TraceColors.medGrey,
+                        size: 16,
                       ),
                     ],
                   ),
                 ),
-                const Icon(
-                  Icons.lock_rounded,
-                  color: TraceColors.medGrey,
-                  size: 16,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 3,
+                child: DropdownButtonFormField<String>(
+                  initialValue: _selectedSection,
+                  decoration: InputDecoration(
+                    labelText: 'Section',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: TraceColors.navyBlue,
+                        width: 2,
+                      ),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                  items: ['A', 'B', 'C']
+                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _selectedSection = v),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
           const SizedBox(height: 4),
           Text(

@@ -17,6 +17,7 @@ class StudentsListScreen extends StatefulWidget {
 
 class _StudentsListScreenState extends State<StudentsListScreen> {
   String _selectedYear = 'All';
+  String _selectedSection = 'All';
   bool _sortAscending = true;
   String _searchQuery = '';
   final List<String> _years = [
@@ -123,7 +124,14 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                   final year = entry.value;
                   return Expanded(
                     child: GestureDetector(
-                      onTap: () => setState(() => _selectedYear = year),
+                      onTap: () {
+                        setState(() {
+                          _selectedYear = year;
+                          if (year == 'All') {
+                            _selectedSection = 'All';
+                          }
+                        });
+                      },
                       child: Container(
                         margin: EdgeInsets.only(
                           right: i == _years.length - 1 ? 0 : 8,
@@ -156,6 +164,49 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
               ),
             ),
 
+            if (_selectedYear != 'All')
+              Container(
+                color: TraceColors.navyBlue,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Row(
+                  children: ['All', 'A', 'B', 'C'].asMap().entries.map((entry) {
+                    final i = entry.key;
+                    final section = entry.value;
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _selectedSection = section),
+                        child: Container(
+                          margin: EdgeInsets.only(
+                            right: i == 3 ? 0 : 8,
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: _selectedSection == section
+                                ? TraceColors.gold
+                                : Colors.white.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: _selectedSection == section
+                                ? null
+                                : Border.all(color: Colors.white24),
+                          ),
+                          child: Text(
+                            section == 'All' ? 'All Sections' : 'Sec $section',
+                            style: GoogleFonts.inter(
+                              color: _selectedSection == section
+                                  ? TraceColors.navyBlue
+                                  : TraceColors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+
             // List
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
@@ -173,11 +224,12 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                   var filteredDocs = _selectedYear == 'All'
                       ? allDocs
                       : allDocs.where((doc) {
-                          final yearLevel =
-                              (doc.data() as Map<String, dynamic>)['year_level']
-                                  ?.toString() ??
-                              '';
-                          return yearLevel == _selectedYear;
+                          final data = doc.data() as Map<String, dynamic>;
+                          final yearLevel = data['year_level']?.toString() ?? '';
+                          final section = data['section']?.toString() ?? '';
+                          bool yearMatches = yearLevel == _selectedYear;
+                          bool sectionMatches = _selectedSection == 'All' || section == _selectedSection;
+                          return yearMatches && sectionMatches;
                         }).toList();
 
                   if (_searchQuery.isNotEmpty) {
@@ -297,6 +349,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                                   final name = data['name'] ?? 'Unknown';
                                   final course = data['course'] ?? '';
                                   final year = data['year_level'] ?? '';
+                                  final section = data['section'] ?? '';
                                   final studentId = data['student_id'] ?? '';
                                   final avatarUrl = data['avatar_url'] ?? '';
                                   final initials = name.isNotEmpty
@@ -364,7 +417,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                                               ),
                                               const SizedBox(height: 4),
                                               Text(
-                                                '$course | $year | $studentId',
+                                                '$course | $year${section.isNotEmpty ? ' | Sec $section' : ''} | $studentId',
                                                 style: GoogleFonts.inter(
                                                   fontSize: 13,
                                                   color: TraceColors.medGrey,
