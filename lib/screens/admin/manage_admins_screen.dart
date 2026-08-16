@@ -19,9 +19,19 @@ class _ManageAdminsScreenState extends ConsumerState<ManageAdminsScreen> {
   static const List<DropdownMenuItem<String>> _roleDropdownItems = [
     DropdownMenuItem(value: 'superadmin', child: Text('Superadmin (President)')),
     DropdownMenuItem(value: 'admin', child: Text('Admin')),
+    DropdownMenuItem(value: 'vice_president', child: Text('Vice President')),
+    DropdownMenuItem(value: 'assoc_vice_president', child: Text('Assoc. Vice President')),
+    DropdownMenuItem(value: 'secretary', child: Text('Secretary')),
+    DropdownMenuItem(value: 'assoc_secretary', child: Text('Assoc. Secretary')),
     DropdownMenuItem(value: 'treasurer', child: Text('Treasurer')),
+    DropdownMenuItem(value: 'assoc_treasurer', child: Text('Assoc. Treasurer')),
     DropdownMenuItem(value: 'auditor', child: Text('Auditor')),
+    DropdownMenuItem(value: 'assoc_auditor', child: Text('Assoc. Auditor')),
     DropdownMenuItem(value: 'pio', child: Text('P.I.O.')),
+    DropdownMenuItem(value: 'assoc_pio', child: Text('Assoc. P.I.O.')),
+    DropdownMenuItem(value: 'pro', child: Text('P.R.O.')),
+    DropdownMenuItem(value: 'assoc_pro_1', child: Text('Assoc. P.R.O. I')),
+    DropdownMenuItem(value: 'assoc_pro_2', child: Text('Assoc. P.R.O. II')),
     DropdownMenuItem(value: 'scanner', child: Text('Scanner (Generic)')),
   ];
 
@@ -31,7 +41,7 @@ class _ManageAdminsScreenState extends ConsumerState<ManageAdminsScreen> {
     final passwordCtrl = TextEditingController();
     bool isProcessing = false;
     bool obscurePassword = true;
-    String role = 'admin';
+    String role = 'vice_president';
 
     showModalBottomSheet(
       context: context,
@@ -206,7 +216,7 @@ class _ManageAdminsScreenState extends ConsumerState<ManageAdminsScreen> {
     final data = doc.data() as Map<String, dynamic>;
     final nameCtrl = TextEditingController(text: data['name'] ?? '');
     final emailCtrl = TextEditingController(text: data['email'] ?? '');
-    String role = data['role'] ?? 'admin';
+    String role = data['role'] ?? 'vice_president';
     bool isProcessing = false;
 
     showModalBottomSheet(

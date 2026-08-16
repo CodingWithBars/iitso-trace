@@ -43,16 +43,46 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   bool _isExportingStudents = false;
 
   List<_NavItem> _getNavItems(String? role) {
-    if (role == 'scanner') {
+    if (role == 'superadmin' || role == 'admin' || role == 'vice_president' || role == 'assoc_vice_president') {
+      return [
+        _NavItem(Icons.dashboard_rounded, 'Dashboard', 0),
+        _NavItem(Icons.event_rounded, 'Events', 1),
+        _NavItem(Icons.campaign_rounded, 'Announcements', 3),
+        _NavItem(Icons.account_balance_wallet_rounded, 'Funds', 4),
+        _NavItem(Icons.qr_code_scanner_rounded, 'Scanner', 2),
+        _NavItem(Icons.people_rounded, 'Students', 5),
+        _NavItem(Icons.verified_user_rounded, 'ID Claims', 6),
+      ];
+    }
+    
+    if (role == 'secretary' || role == 'assoc_secretary') {
       return [
         _NavItem(Icons.dashboard_rounded, 'Dashboard', 0),
         _NavItem(Icons.event_rounded, 'Events', 1),
         _NavItem(Icons.people_rounded, 'Students', 5),
+        _NavItem(Icons.verified_user_rounded, 'ID Claims', 6),
+        _NavItem(Icons.qr_code_scanner_rounded, 'Scanner', 2),
+      ];
+    }
+
+    if (role == 'treasurer' || role == 'assoc_treasurer') {
+      return [
+        _NavItem(Icons.dashboard_rounded, 'Dashboard', 0),
+        _NavItem(Icons.account_balance_wallet_rounded, 'Funds', 4),
+        _NavItem(Icons.people_rounded, 'Students', 5),
+        _NavItem(Icons.qr_code_scanner_rounded, 'Scanner', 2),
+      ];
+    }
+
+    if (role == 'auditor' || role == 'assoc_auditor') {
+      return [
+        _NavItem(Icons.dashboard_rounded, 'Dashboard', 0),
+        _NavItem(Icons.account_balance_wallet_rounded, 'Funds', 4),
         _NavItem(Icons.qr_code_scanner_rounded, 'Scanner', 2),
       ];
     }
     
-    if (role == 'pio') {
+    if (role == 'pio' || role == 'assoc_pio' || role == 'pro' || role == 'assoc_pro_1' || role == 'assoc_pro_2') {
       return [
         _NavItem(Icons.dashboard_rounded, 'Dashboard', 0),
         _NavItem(Icons.event_rounded, 'Events', 1),
@@ -61,32 +91,12 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
       ];
     }
     
-    if (role == 'treasurer') {
-      return [
-        _NavItem(Icons.dashboard_rounded, 'Dashboard', 0),
-        _NavItem(Icons.account_balance_wallet_rounded, 'Funds', 4),
-        _NavItem(Icons.people_rounded, 'Students', 5),
-        _NavItem(Icons.qr_code_scanner_rounded, 'Scanner', 2),
-      ];
-    }
-    
-    if (role == 'auditor') {
-      return [
-        _NavItem(Icons.dashboard_rounded, 'Dashboard', 0),
-        _NavItem(Icons.account_balance_wallet_rounded, 'Funds', 4),
-        _NavItem(Icons.qr_code_scanner_rounded, 'Scanner', 2),
-      ];
-    }
-    
-    // admin and superadmin
+    // Default / scanner
     return [
       _NavItem(Icons.dashboard_rounded, 'Dashboard', 0),
       _NavItem(Icons.event_rounded, 'Events', 1),
-      _NavItem(Icons.campaign_rounded, 'Announcements', 3),
-      _NavItem(Icons.account_balance_wallet_rounded, 'Funds', 4),
-      _NavItem(Icons.qr_code_scanner_rounded, 'Scanner', 2),
       _NavItem(Icons.people_rounded, 'Students', 5),
-      _NavItem(Icons.verified_user_rounded, 'ID Claims', 6),
+      _NavItem(Icons.qr_code_scanner_rounded, 'Scanner', 2),
     ];
   }
 
@@ -94,7 +104,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
 
   bool _canManageFunds(WidgetRef ref) {
     final role = ref.watch(adminRoleProvider).value;
-    return role == 'superadmin' || role == 'auditor';
+    return role == 'superadmin' || role == 'auditor' || role == 'assoc_auditor';
   }
 
   @override

@@ -29,17 +29,23 @@ class OverviewTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final role = ref.watch(adminRoleProvider).value;
     
+    final isExec = role == 'superadmin' || role == 'admin' || role == 'vice_president' || role == 'assoc_vice_president';
+    final isSec = role == 'secretary' || role == 'assoc_secretary';
+    final isFin = role == 'treasurer' || role == 'assoc_treasurer';
+    final isAud = role == 'auditor' || role == 'assoc_auditor';
+    final isCom = role == 'pio' || role == 'assoc_pio' || role == 'pro' || role == 'assoc_pro_1' || role == 'assoc_pro_2';
+    
     final canManageAdmins = role == 'superadmin';
-    final canViewFunds = role == 'superadmin' || role == 'admin' || role == 'treasurer' || role == 'auditor';
-    final canManageFunds = role == 'superadmin' || role == 'admin' || role == 'treasurer';
-    final canViewEvents = role == 'superadmin' || role == 'admin' || role == 'pio' || role == 'scanner';
-    final canAddEvent = role == 'superadmin' || role == 'admin' || role == 'pio';
-    final canViewStudents = role == 'superadmin' || role == 'admin' || role == 'treasurer' || role == 'scanner';
-    final canPostNews = role == 'superadmin' || role == 'admin' || role == 'pio';
-    final canViewScans = role == 'superadmin' || role == 'admin' || role == 'pio' || role == 'scanner';
-    final canManageAttendance = role == 'superadmin' || role == 'admin' || role == 'scanner';
-    final canViewClaims = role == 'superadmin' || role == 'admin';
-    final canGenerateReport = role == 'superadmin' || role == 'admin' || role == 'treasurer' || role == 'auditor';
+    final canViewFunds = isExec || isFin || isAud;
+    final canManageFunds = isExec || isFin;
+    final canViewEvents = isExec || isSec || isCom || role == 'scanner';
+    final canAddEvent = isExec || isCom;
+    final canViewStudents = isExec || isSec || isFin || role == 'scanner';
+    final canPostNews = isExec || isCom;
+    final canViewScans = true; // All roles can scan as per Option B
+    final canManageAttendance = true; // All roles can scan as per Option B
+    final canViewClaims = isExec || isSec;
+    final canGenerateReport = isExec || isFin || isAud;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
