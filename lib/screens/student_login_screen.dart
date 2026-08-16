@@ -78,9 +78,7 @@ class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen> {
             if (result.isOffline) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text(
-                    '✓ Logged in using cached data (offline mode)',
-                  ),
+                  content: Text('✓ Logged in using cached data (offline mode)'),
                   backgroundColor: Colors.orange,
                   duration: Duration(seconds: 3),
                 ),
@@ -160,7 +158,9 @@ class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen> {
                     counterText: '',
                     suffixIcon: IconButton(
                       icon: Icon(
-                        obscurePin ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        obscurePin
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
                         color: TraceColors.medGrey,
                       ),
                       onPressed: () => setLocal(() => obscurePin = !obscurePin),
@@ -179,19 +179,30 @@ class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen> {
                     counterText: '',
                     suffixIcon: IconButton(
                       icon: Icon(
-                        obscureConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        obscureConfirm
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
                         color: TraceColors.medGrey,
                       ),
-                      onPressed: () => setLocal(() => obscureConfirm = !obscureConfirm),
+                      onPressed: () =>
+                          setLocal(() => obscureConfirm = !obscureConfirm),
                     ),
                   ),
                 ),
-                if (error != null) ...[const SizedBox(height: 8), Text(error!, style: const TextStyle(color: Colors.red, fontSize: 12))],
+                if (error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    error!,
+                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                  ),
+                ],
               ],
             ),
             actions: [
               ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: TraceColors.navyBlue),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: TraceColors.navyBlue,
+                ),
                 onPressed: () async {
                   final pin = pinCtrl.text.trim();
                   final confirm = confirmCtrl.text.trim();
@@ -207,19 +218,31 @@ class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen> {
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('PIN set successfully! Logging in...'), backgroundColor: TraceColors.success),
+                      const SnackBar(
+                        content: Text('PIN set successfully! Logging in...'),
+                        backgroundColor: TraceColors.success,
+                      ),
                     );
                     // Fetch freshly-set student to cache for offline use
-                    final updatedStudent = await StudentService.getStudentByStudentId(studentId);
-                    await ref.read(studentSessionProvider.notifier).login(
-                      studentId,
-                      student: updatedStudent,
-                      pinHash: StudentService.hashPin(pin),
-                    );
+                    final updatedStudent =
+                        await StudentService.getStudentByStudentId(studentId);
+                    await ref
+                        .read(studentSessionProvider.notifier)
+                        .login(
+                          studentId,
+                          student: updatedStudent,
+                          pinHash: StudentService.hashPin(pin),
+                        );
                     if (mounted) context.push('/student/id/$studentId');
                   }
                 },
-                child: Text('Save PIN', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold)),
+                child: Text(
+                  'Save PIN',
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           ),
@@ -251,248 +274,260 @@ class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen> {
       ),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          padding: const EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 60,
+            bottom: 20,
+          ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
-            child: TraceCard(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: TraceColors.navyBlue.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        _isAdmin ? Icons.admin_panel_settings : Icons.person,
-                        size: 48,
-                        color: TraceColors.navyBlue,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      _isAdmin ? 'Admin Portal' : 'View My ID',
-                      style: GoogleFonts.inter(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: TraceColors.navyBlue,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _isAdmin
-                          ? 'Sign in to access management dashboard'
-                          : 'Enter your details to view your Digital ID',
-                      style: GoogleFonts.inter(color: TraceColors.medGrey),
-                    ),
-                    const SizedBox(height: 32),
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.topCenter,
+              children: [
+                TraceCard(
+                  padding: const EdgeInsets.only(
+                    left: 20,
+                    right: 20,
+                    top: 56,
+                    bottom: 24,
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _isAdmin ? 'Admin Portal' : 'View My ID',
+                          style: GoogleFonts.inter(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: TraceColors.navyBlue,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _isAdmin
+                              ? 'Sign in to access management dashboard'
+                              : 'Enter your details to view your Digital ID',
+                          style: GoogleFonts.inter(color: TraceColors.medGrey),
+                        ),
+                        const SizedBox(height: 32),
 
-                    // Tab switch
-                    Container(
-                      decoration: BoxDecoration(
-                        color: TraceColors.lightGrey.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding: const EdgeInsets.all(4),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => setState(() {
-                                _isAdmin = false;
-                                _formKey.currentState?.reset();
-                              }),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: !_isAdmin
-                                      ? TraceColors.navyBlue
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    'Student',
-                                    style: GoogleFonts.inter(
-                                      fontWeight: FontWeight.w700,
+                        // Tab switch
+                        Container(
+                          decoration: BoxDecoration(
+                            color: TraceColors.lightGrey.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.all(4),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => setState(() {
+                                    _isAdmin = false;
+                                    _formKey.currentState?.reset();
+                                  }),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    decoration: BoxDecoration(
                                       color: !_isAdmin
-                                          ? Colors.white
-                                          : TraceColors.navyBlue,
+                                          ? TraceColors.navyBlue
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'Student',
+                                        style: GoogleFonts.inter(
+                                          fontWeight: FontWeight.w700,
+                                          color: !_isAdmin
+                                              ? Colors.white
+                                              : TraceColors.navyBlue,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => setState(() {
-                                _isAdmin = true;
-                                _formKey.currentState?.reset();
-                              }),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _isAdmin
-                                      ? TraceColors.navyBlue
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    'Admin',
-                                    style: GoogleFonts.inter(
-                                      fontWeight: FontWeight.w700,
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => setState(() {
+                                    _isAdmin = true;
+                                    _formKey.currentState?.reset();
+                                  }),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    decoration: BoxDecoration(
                                       color: _isAdmin
-                                          ? Colors.white
-                                          : TraceColors.navyBlue,
+                                          ? TraceColors.navyBlue
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'Admin',
+                                        style: GoogleFonts.inter(
+                                          fontWeight: FontWeight.w700,
+                                          color: _isAdmin
+                                              ? Colors.white
+                                              : TraceColors.navyBlue,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+
+                        if (!_isAdmin) ...[
+                          TextFormField(
+                            controller: _idController,
+                            decoration: const InputDecoration(
+                              labelText: 'Student ID',
+                              prefixIcon: Icon(Icons.badge_outlined),
+                              hintText: 'e.g. 2024-00001',
+                            ),
+                            validator: (v) => v == null || v.isEmpty
+                                ? 'Student ID is required'
+                                : null,
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: const InputDecoration(
+                              labelText: 'Email Address',
+                              prefixIcon: Icon(Icons.email_outlined),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.isEmpty) {
+                                return 'Email is required';
+                              }
+                              if (!v.contains('@'))
+                                return 'Enter a valid email';
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _pinController,
+                            obscureText: _obscurePin,
+                            keyboardType: TextInputType.number,
+                            maxLength: 6,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            decoration: InputDecoration(
+                              labelText: 'PIN (Leave blank if old account)',
+                              hintText: '4–6 digit PIN',
+                              prefixIcon: const Icon(Icons.pin_outlined),
+                              counterText: '',
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePin
+                                      ? Icons.visibility_off_outlined
+                                      : Icons.visibility_outlined,
+                                  color: TraceColors.medGrey,
+                                ),
+                                onPressed: () =>
+                                    setState(() => _obscurePin = !_obscurePin),
+                              ),
+                            ),
+                            validator: (v) {
+                              if (v != null && v.isNotEmpty && v.length < 4) {
+                                return 'PIN must be at least 4 digits';
+                              }
+                              return null;
+                            },
+                            onFieldSubmitted: (_) => _login(),
+                          ),
+                        ] else ...[
+                          TextFormField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: const InputDecoration(
+                              labelText: 'Admin Email',
+                              prefixIcon: Icon(Icons.email_outlined),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.isEmpty) {
+                                return 'Email is required';
+                              }
+                              if (!v.contains('@'))
+                                return 'Enter a valid email';
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
+                            decoration: InputDecoration(
+                              labelText: 'Password',
+                              prefixIcon: const Icon(
+                                Icons.lock_outline_rounded,
+                              ),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_off_outlined
+                                      : Icons.visibility_outlined,
+                                  color: TraceColors.medGrey,
+                                ),
+                                onPressed: () => setState(
+                                  () => _obscurePassword = !_obscurePassword,
+                                ),
+                              ),
+                            ),
+                            validator: (v) => v == null || v.isEmpty
+                                ? 'Password is required'
+                                : null,
+                            onFieldSubmitted: (_) => _login(),
+                          ),
+                        ],
+
+                        const SizedBox(height: 32),
+                        GoldButton(
+                          label: _isAdmin ? 'Sign In' : 'View ID',
+                          icon: Icons.login,
+                          isLoading: _isLoading,
+                          fullWidth: true,
+                          onPressed: _login,
+                        ),
+
+                        if (!_isAdmin) ...[
+                          const SizedBox(height: 16),
+                          TextButton(
+                            onPressed: () => context.go('/register'),
+                            child: Text(
+                              "Don't have an account yet? Register here",
+                              style: GoogleFonts.inter(
+                                color: TraceColors.navyBlue,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
                               ),
                             ),
                           ),
                         ],
-                      ),
+                      ],
                     ),
-                    const SizedBox(height: 32),
-
-                    if (!_isAdmin) ...[
-                      TextFormField(
-                        controller: _idController,
-                        decoration: const InputDecoration(
-                          labelText: 'Student ID',
-                          prefixIcon: Icon(Icons.badge_outlined),
-                          hintText: 'e.g. 2024-00001',
-                        ),
-                        validator: (v) => v == null || v.isEmpty
-                            ? 'Student ID is required'
-                            : null,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(
-                          labelText: 'Email Address',
-                          prefixIcon: Icon(Icons.email_outlined),
-                        ),
-                        validator: (v) {
-                          if (v == null || v.isEmpty) {
-                            return 'Email is required';
-                          }
-                          if (!v.contains('@')) return 'Enter a valid email';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _pinController,
-                        obscureText: _obscurePin,
-                        keyboardType: TextInputType.number,
-                        maxLength: 6,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        decoration: InputDecoration(
-                          labelText: 'PIN (Leave blank if old account)',
-                          hintText: '4–6 digit PIN',
-                          prefixIcon: const Icon(Icons.pin_outlined),
-                          counterText: '',
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePin
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
-                              color: TraceColors.medGrey,
-                            ),
-                            onPressed: () => setState(
-                              () => _obscurePin = !_obscurePin,
-                            ),
-                          ),
-                        ),
-                        validator: (v) {
-                          if (v != null && v.isNotEmpty && v.length < 4) {
-                            return 'PIN must be at least 4 digits';
-                          }
-                          return null;
-                        },
-                        onFieldSubmitted: (_) => _login(),
-                      ),
-                    ] else ...[
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(
-                          labelText: 'Admin Email',
-                          prefixIcon: Icon(Icons.email_outlined),
-                        ),
-                        validator: (v) {
-                          if (v == null || v.isEmpty) {
-                            return 'Email is required';
-                          }
-                          if (!v.contains('@')) return 'Enter a valid email';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: const Icon(Icons.lock_outline_rounded),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
-                              color: TraceColors.medGrey,
-                            ),
-                            onPressed: () => setState(
-                              () => _obscurePassword = !_obscurePassword,
-                            ),
-                          ),
-                        ),
-                        validator: (v) => v == null || v.isEmpty
-                            ? 'Password is required'
-                            : null,
-                        onFieldSubmitted: (_) => _login(),
-                      ),
-                    ],
-
-                    const SizedBox(height: 32),
-                    GoldButton(
-                      label: _isAdmin ? 'Sign In' : 'View ID',
-                      icon: Icons.login,
-                      isLoading: _isLoading,
-                      fullWidth: true,
-                      onPressed: _login,
-                    ),
-
-                    if (!_isAdmin) ...[
-                      const SizedBox(height: 16),
-                      TextButton(
-                        onPressed: () => context.go('/register'),
-                        child: Text(
-                          "Don't have an account yet? Register here",
-                          style: GoogleFonts.inter(
-                            color: TraceColors.navyBlue,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
-              ),
+                Positioned(
+                  top: -40,
+                  child: Image.asset('assets/iitso-logo.png', height: 200),
+                ),
+              ],
             ),
           ),
         ),

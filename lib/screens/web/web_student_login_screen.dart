@@ -231,30 +231,21 @@ class _WebStudentLoginScreenState extends ConsumerState<WebStudentLoginScreen> {
       ),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          padding: const EdgeInsets.only(left: 16, right: 16, top: 60, bottom: 20),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
-            child: TraceCard(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: TraceColors.navyBlue.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        _isAdmin ? Icons.admin_panel_settings : Icons.person,
-                        size: 48,
-                        color: TraceColors.navyBlue,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.topCenter,
+              children: [
+                TraceCard(
+                  padding: const EdgeInsets.only(left: 20, right: 20, top: 56, bottom: 24),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
                       _isAdmin ? 'Admin Portal' : 'View My ID',
                       style: GoogleFonts.inter(
                         fontSize: 24,
@@ -473,7 +464,16 @@ class _WebStudentLoginScreenState extends ConsumerState<WebStudentLoginScreen> {
                 ),
               ),
             ),
-          ),
+            Positioned(
+              top: -40,
+              child: Image.asset(
+                'assets/iitso-logo.png',
+                height: 80,
+              ),
+            ),
+          ],
+        ),
+      ),
         ),
       ),
     );
