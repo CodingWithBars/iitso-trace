@@ -210,14 +210,26 @@ class StudentService {
           .where('student_id', isEqualTo: studentId)
           .limit(1)
           .get();
-      if (snap.docs.isEmpty) return null;
+      if (snap.docs.isEmpty) {
+        // Even if network works, maybe it's missing? Fallback to cache just in case.
+        return _getStudentFromCache(studentId);
+      }
       return Student.fromMap(
         snap.docs.first.data() as Map<String, dynamic>,
         snap.docs.first.id,
       );
     } catch (e) {
-      return null;
+      debugPrint('Firestore fetch failed, checking offline cache: $e');
+      return _getStudentFromCache(studentId);
     }
+  }
+
+  static Future<Student?> _getStudentFromCache(String studentId) async {
+    final cached = await OfflineCacheService.getStudentProfile(studentId);
+    if (cached != null) {
+      return Student.fromMap(cached, cached['id'] as String? ?? '');
+    }
+    return null;
   }
 
   static Future<Student?> getStudentByQrHash(String qrHash) async {

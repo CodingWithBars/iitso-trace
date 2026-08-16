@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../widgets/shared_widgets.dart';
 import '../services/student_service.dart';
 import '../services/student_session_service.dart';
+import '../services/network_service.dart';
 import '../models/student.dart';
 
 class StudentIdScreen extends ConsumerStatefulWidget {
@@ -44,6 +45,17 @@ class _StudentIdScreenState extends ConsumerState<StudentIdScreen> {
 
   void _openEditProfile() {
     if (_student == null) return;
+    
+    if (NetworkService().isOffline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Settings changes are not allowed while offline.'),
+          backgroundColor: TraceColors.error,
+        ),
+      );
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,

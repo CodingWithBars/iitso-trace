@@ -462,6 +462,15 @@ class _ScannerScreenState extends State<ScannerScreen>
       offlineAttendance: _offlineAttendance,
     );
 
+    if (_isOfflineMode && _offlineStudents != null && _offlineAttendance != null) {
+      // Force persist the offline attendance map immediately so it survives restarts
+      await OfflineCacheService.saveOfflineScannerData(
+        eventId: _selectedEvent!.id,
+        students: _offlineStudents!,
+        attendance: _offlineAttendance!,
+      );
+    }
+
     if (!mounted) {
       // Widget was disposed while processing — reset state and bail
       return;
@@ -493,6 +502,15 @@ class _ScannerScreenState extends State<ScannerScreen>
                   isOfflineMode: _isOfflineMode,
                   offlineAttendance: _offlineAttendance,
                 );
+
+                if (_isOfflineMode && _offlineStudents != null && _offlineAttendance != null) {
+                  // Re-persist after voiding to ensure UI cache stays consistent
+                  await OfflineCacheService.saveOfflineScannerData(
+                    eventId: _selectedEvent!.id,
+                    students: _offlineStudents!,
+                    attendance: _offlineAttendance!,
+                  );
+                }
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Scan voided successfully.')),
