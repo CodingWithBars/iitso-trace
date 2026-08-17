@@ -6,6 +6,7 @@ import '../../../theme/app_theme.dart';
 import '../../../widgets/admin_widgets.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/csv_report_service.dart';
+import '../../../widgets/sync_indicator_widget.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -42,7 +43,6 @@ class OverviewTab extends ConsumerWidget {
     final canAddEvent = isExec || isCom;
     final canViewStudents = isExec || isSec || isFin || role == 'scanner';
     final canPostNews = isExec || isCom;
-    final canViewScans = true; // All roles can scan as per Option B
     final canManageAttendance = true; // All roles can scan as per Option B
     final canViewClaims = isExec || isSec;
     final canGenerateReport = isExec || isFin || isAud;
@@ -68,31 +68,17 @@ class OverviewTab extends ConsumerWidget {
           const SizedBox(height: 24),
           // Live stats grid from Firestore
           StreamBuilder<QuerySnapshot>(
-            stream: FirestoreService.db.collection('students').snapshots(),
+            stream: FirestoreService.db.collection('students').snapshots(includeMetadataChanges: true),
             builder: (ctx, studentSnap) => StreamBuilder<QuerySnapshot>(
-              stream: FirestoreService.db.collection('events').snapshots(),
+              stream: FirestoreService.db.collection('events').snapshots(includeMetadataChanges: true),
               builder: (ctx, eventSnap) => StreamBuilder<QuerySnapshot>(
-                stream: FirestoreService.db.collection('funds').snapshots(),
+                stream: FirestoreService.db.collection('funds').snapshots(includeMetadataChanges: true),
                 builder: (ctx, fundsSnap) => StreamBuilder<QuerySnapshot>(
                   stream: FirestoreService.db
-                      .collection('attendance')
-                      .where(
-                        'created_at',
-                        isGreaterThanOrEqualTo: Timestamp.fromDate(
-                          DateTime(
-                            DateTime.now().year,
-                            DateTime.now().month,
-                            DateTime.now().day,
-                          ),
-                        ),
-                      )
-                      .snapshots(),
-                  builder: (ctx, attendSnap) => StreamBuilder<QuerySnapshot>(
-                    stream: FirestoreService.db
-                        .collection('id_claims')
-                        .where('status', isEqualTo: 'pending')
-                        .snapshots(),
-                    builder: (ctx, claimsSnap) {
+                      .collection('id_claims')
+                      .where('status', isEqualTo: 'pending')
+                      .snapshots(includeMetadataChanges: true),
+                  builder: (ctx, claimsSnap) {
                       final studentCount = studentSnap.hasData
                           ? studentSnap.data!.docs.length
                           : 0;
@@ -115,9 +101,7 @@ class OverviewTab extends ConsumerWidget {
                           }
                         }
                       }
-                      final todayScans = attendSnap.hasData
-                          ? attendSnap.data!.docs.length
-                          : 0;
+                      final double balance = income - expense;
 
                       return LayoutBuilder(
                         builder: (ctx, constraints) {
@@ -138,6 +122,12 @@ class OverviewTab extends ConsumerWidget {
                                 value: '₱${NumberFormat('#,##0.00', 'en_US').format(expense)}',
                                 icon: Icons.money_off_rounded,
                                 color: TraceColors.error,
+                              ),
+                              AdminStatCard(
+                                label: 'Available Balance',
+                                value: '₱${NumberFormat('#,##0.00', 'en_US').format(balance)}',
+                                icon: Icons.savings_rounded,
+                                color: TraceColors.navyBlue,
                               ),
                             ]);
                           }
@@ -163,17 +153,6 @@ class OverviewTab extends ConsumerWidget {
                                   icon: Icons.people_rounded,
                                   color: TraceColors.royalBlue,
                                 ),
-                              ),
-                            );
-                          }
-                          
-                          if (canViewScans) {
-                            cards.add(
-                              AdminStatCard(
-                                label: 'Scans Today',
-                                value: todayScans.toString(),
-                                icon: Icons.qr_code_scanner_rounded,
-                                color: Colors.purple,
                               ),
                             );
                           }
@@ -231,7 +210,6 @@ class OverviewTab extends ConsumerWidget {
                 ),
               ),
             ),
-          ),
           const SizedBox(height: 24),
           // Quick actions
           Row(
@@ -304,7 +282,8 @@ class OverviewTab extends ConsumerWidget {
                   }
                 ));
               }
-              
+
+              actions.add(const SyncIndicatorWidget());
 
               return Wrap(
                 spacing: 8,

@@ -11,6 +11,9 @@ class NetworkService {
   StreamSubscription? _connectivitySub;
   bool _isOffline = false;
 
+  static final StreamController<bool> _offlineStateController = StreamController<bool>.broadcast();
+  static Stream<bool> get onOfflineStateChanged => _offlineStateController.stream;
+
   bool get isOffline => _isOffline;
 
   static Future<void> initialize() async {
@@ -45,6 +48,7 @@ class NetworkService {
         );
         FirebaseFirestore.instance.enableNetwork();
       }
+      _offlineStateController.add(_isOffline);
     }
   }
 

@@ -195,7 +195,7 @@ class AttendanceService {
 
         if (offlineAttendance != null) {
           final existingKey = offlineAttendance.keys.firstWhere(
-            (k) => offlineAttendance[k]?['student_id'] == student!.id,
+            (k) => offlineAttendance[k]?['student_id'] == student!.studentId,
             orElse: () => '',
           );
           if (existingKey.isNotEmpty) {
@@ -271,15 +271,14 @@ class AttendanceService {
           'is_offline_scan': isOfflineMode,
         };
 
-        String newDocId = '';
+        final newDocId = '${event.id}_${student.studentId}';
+        final newDocRef = FirestoreService.attendance.doc(newDocId);
+        
         if (isOfflineMode) {
-          final newDocRef = FirestoreService.attendance.doc();
-          newDocId = newDocRef.id;
           if (offlineAttendance != null) offlineAttendance[newDocId] = newData;
-          newDocRef.set(newData); // Fire and forget
+          newDocRef.set(newData, SetOptions(merge: true)); // Fire and forget
         } else {
-          final newDocRef = await FirestoreService.attendance.add(newData);
-          newDocId = newDocRef.id;
+          await newDocRef.set(newData, SetOptions(merge: true));
           await ActivityLogService.log(
             action: 'attendance_scan',
             message:

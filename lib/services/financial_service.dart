@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../models/obligation.dart';
 import '../models/student.dart';
 import '../models/event.dart';
+import '../models/attendance.dart';
 import 'auth_service.dart';
 import 'student_service.dart';
 
@@ -368,21 +369,48 @@ class FinancialService {
         remarks = hasNonMonetary
             ? event.sanctionDescription!
             : 'Absent on ${event.date.toString().split(' ').first}';
-      } else if (attData['final_status'] == 'Late' && hasMonetary) {
-        // Late
-        final totalHours = _calculateTotalEventHours(event);
-        if (totalHours > 0) {
-          final missedHours = _calculateMissedHours(event, attData);
-          if (missedHours > 0) {
-            amount = (missedHours / totalHours) * event.sanctionAmount!;
-            // Round to nearest multiple of 5 for clean currency amounts (e.g., 50-45-40)
-            amount = (amount / 5.0).round() * 5.0;
-            if (amount > event.sanctionAmount!) amount = event.sanctionAmount!;
-            
-            if (amount > 0) {
-              createObligation = true;
-              title = 'Late: ${event.eventName}';
-              remarks = 'Late penalty for missed hours (${missedHours.toStringAsFixed(1)} hrs)';
+      } else {
+        final att = Attendance.fromMap(attData, '');
+        final det = DetailedAttendance.calculate(att, event);
+        final status = det.overallStatus;
+
+        if (status == 'ABSENT') {
+          createObligation = true;
+          amount = hasMonetary ? event.sanctionAmount! : 0.0;
+          title = 'Absent: ${event.eventName}';
+          remarks = hasNonMonetary
+              ? event.sanctionDescription!
+              : 'Absent on ${event.date.toString().split(' ').first}';
+        } else if (status == 'EXCUSED') {
+          // Do nothing for excused
+        } else if (status == 'VOID') {
+           createObligation = true;
+           amount = hasMonetary ? event.sanctionAmount! : 0.0;
+           title = 'Absent: ${event.eventName}';
+           remarks = 'Invalid/Voided scans for ${event.eventName}';
+        } else if (hasMonetary && (status == 'LATE' || status == 'INCOMPLETE')) {
+          final totalHours = det.totalEventDuration.inMinutes / 60.0;
+          if (totalHours > 0) {
+            final missedHours = det.missedDuration.inMinutes / 60.0;
+            if (missedHours > 0) {
+              amount = (missedHours / totalHours) * event.sanctionAmount!;
+              
+              if (amount > 0 && amount < 5.0) {
+                // Minimum 5 pesos penalty for any incomplete time
+                amount = 5.0;
+              } else {
+                // Round to nearest multiple of 5 for clean currency amounts
+                amount = (amount / 5.0).round() * 5.0;
+              }
+              
+              if (amount > event.sanctionAmount!) amount = event.sanctionAmount!;
+              
+              if (amount > 0) {
+                createObligation = true;
+                final isLate = status == 'LATE';
+                title = isLate ? 'Late: ${event.eventName}' : 'Incomplete: ${event.eventName}';
+                remarks = '${isLate ? 'Late' : 'Incomplete'} penalty for missed hours (${missedHours.toStringAsFixed(1)} hrs)';
+              }
             }
           }
         }
@@ -410,80 +438,6 @@ class FinancialService {
 
     if (count > 0) await batch.commit();
     return count;
-  }
-
-  static double _calculateTotalEventHours(Event event) {
-    double total = 0;
-    if (event.morningTimeIn != null && event.morningTimeOut != null) {
-      final amIn = _parseTimeStr(event.morningTimeIn!);
-      final amOut = _parseTimeStr(event.morningTimeOut!);
-      if (amOut > amIn) total += (amOut - amIn);
-    }
-    if (event.afternoonTimeIn != null && event.afternoonTimeOut != null) {
-      final pmIn = _parseTimeStr(event.afternoonTimeIn!);
-      final pmOut = _parseTimeStr(event.afternoonTimeOut!);
-      if (pmOut > pmIn) total += (pmOut - pmIn);
-    }
-    return total;
-  }
-
-  static double _parseTimeStr(String timeStr) {
-    try {
-      final parts = timeStr.split(':');
-      final hour = int.parse(parts[0]);
-      final minute = int.parse(parts[1]);
-      return hour + (minute / 60.0);
-    } catch (_) {
-      return 0.0;
-    }
-  }
-
-  static double _calculateMissedHours(Event event, Map<String, dynamic> data) {
-    if (data.containsKey('manual_late_hours') && data['manual_late_hours'] != null) {
-      return (data['manual_late_hours'] as num).toDouble();
-    }
-
-    double missed = 0.0;
-
-    // AM Session
-    if (event.morningTimeIn != null && event.morningTimeOut != null) {
-      final amIn = _parseTimeStr(event.morningTimeIn!);
-      final amOut = _parseTimeStr(event.morningTimeOut!);
-      final amDuration = amOut - amIn;
-      if (amDuration > 0) {
-        if (data['time_in_am'] == null) {
-          missed += amDuration; // Missed entire AM session
-        } else {
-          final actualAmInDt = (data['time_in_am'] as Timestamp).toDate();
-          final actualAmIn = actualAmInDt.hour + (actualAmInDt.minute / 60.0);
-          if (actualAmIn > amIn) {
-            final lateHours = actualAmIn - amIn;
-            missed += (lateHours > amDuration) ? amDuration : lateHours;
-          }
-        }
-      }
-    }
-
-    // PM Session
-    if (event.afternoonTimeIn != null && event.afternoonTimeOut != null) {
-      final pmIn = _parseTimeStr(event.afternoonTimeIn!);
-      final pmOut = _parseTimeStr(event.afternoonTimeOut!);
-      final pmDuration = pmOut - pmIn;
-      if (pmDuration > 0) {
-        if (data['time_in_pm'] == null) {
-          missed += pmDuration;
-        } else {
-          final actualPmInDt = (data['time_in_pm'] as Timestamp).toDate();
-          final actualPmIn = actualPmInDt.hour + (actualPmInDt.minute / 60.0);
-          if (actualPmIn > pmIn) {
-            final lateHours = actualPmIn - pmIn;
-            missed += (lateHours > pmDuration) ? pmDuration : lateHours;
-          }
-        }
-      }
-    }
-
-    return missed;
   }
 
   /// Bulk-assign event contribution obligation to all registered students.

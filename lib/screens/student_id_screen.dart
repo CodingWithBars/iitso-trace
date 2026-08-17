@@ -448,6 +448,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   late TextEditingController _nameCtrl;
   String? _selectedSection;
   Uint8List? _pickedBytes;
+  String? _pickedBase64;
   bool _isSaving = false;
   String? _generalError;
 
@@ -474,7 +475,10 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     );
     if (file == null) return;
     final bytes = await file.readAsBytes();
-    setState(() => _pickedBytes = bytes);
+    setState(() {
+      _pickedBytes = bytes;
+      _pickedBase64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    });
   }
 
   Future<void> _save() async {
@@ -490,11 +494,16 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     try {
       String? newAvatarUrl;
       if (_pickedBytes != null) {
-        // Upload to Firebase Storage; service handles fallback
-        newAvatarUrl = await StudentService.uploadAvatar(
-          _pickedBytes!,
-          widget.student.studentId,
-        );
+        try {
+          newAvatarUrl =
+              await StudentService.uploadAvatar(
+                _pickedBytes!,
+                widget.student.studentId,
+              ) ??
+              _pickedBase64;
+        } catch (_) {
+          newAvatarUrl = _pickedBase64;
+        }
       }
       await StudentService.updateStudentProfile(
         docId: widget.student.id,
@@ -504,7 +513,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       );
       final updated = Student(
         id: widget.student.id,
-        studentId: widget.student.studentId, // ID is immutable from here
+        studentId: widget.student.studentId,
         name: name,
         course: widget.student.course,
         yearLevel: widget.student.yearLevel,
@@ -660,95 +669,102 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
           ),
           const SizedBox(height: 16),
 
-          // Student ID is locked — displayed read-only (with Section beside it)
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 flex: 5,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                  decoration: BoxDecoration(
-                    color: TraceColors.offWhite,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: TraceColors.lightGrey),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.badge_outlined,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Student ID',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
                         color: TraceColors.medGrey,
-                        size: 20,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Student ID',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                color: TraceColors.medGrey,
-                              ),
-                            ),
-                            Text(
-                              widget.student.studentId,
-                              style: GoogleFonts.inter(
-                                fontSize: 15,
-                                color: TraceColors.navyBlue,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: TextEditingController(
+                        text: widget.student.studentId,
+                      ),
+                      enabled: false,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        disabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: TraceColors.lightGrey.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        fillColor: TraceColors.lightGrey.withValues(alpha: 0.1),
+                        filled: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        suffixIcon: const Icon(
+                          Icons.lock_outline,
+                          color: TraceColors.medGrey,
+                          size: 18,
                         ),
                       ),
-                      const Icon(
-                        Icons.lock_rounded,
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
                         color: TraceColors.medGrey,
-                        size: 16,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
                 flex: 3,
-                child: DropdownButtonFormField<String>(
-                  initialValue: _selectedSection,
-                  decoration: InputDecoration(
-                    labelText: 'Section',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                        color: TraceColors.navyBlue,
-                        width: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Section',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: TraceColors.medGrey,
                       ),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedSection,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: TraceColors.navyBlue,
+                            width: 2,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                      items: ['A', 'B', 'C']
+                          .map(
+                            (s) => DropdownMenuItem(value: s, child: Text(s)),
+                          )
+                          .toList(),
+                      onChanged: (v) => setState(() => _selectedSection = v),
                     ),
-                  ),
-                  items: ['A', 'B', 'C']
-                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                      .toList(),
-                  onChanged: (v) => setState(() => _selectedSection = v),
+                  ],
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'To change your Student ID, submit an ID Claim via the Org admin.',
-            style: GoogleFonts.inter(fontSize: 11, color: TraceColors.medGrey),
           ),
 
           if (_generalError != null) ...[

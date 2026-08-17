@@ -87,7 +87,7 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
     if (role != 'superadmin' && role != 'admin' && role != 'treasurer') {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('You do not have permission to apply sanctions.')),
+          const SnackBar(content: Text('You do not have permission to apply sanctions.', style: TextStyle(color: Colors.white)), backgroundColor: TraceColors.error),
         );
       }
       return;
@@ -96,10 +96,10 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Apply Sanctions'),
+        title: const Text('Generate Sanctions'),
         content: Text(
           event.sanctionAmount != null && event.sanctionAmount! > 0
-              ? 'This will create a ₱${event.sanctionAmount!.toStringAsFixed(2)} sanction record for every student NOT in attendance. Continue?'
+              ? 'This will generate sanctions for every student who missed hours (Absent, Incomplete, or Late), with prorated fines calculated automatically up to a maximum of ₱${event.sanctionAmount!.toStringAsFixed(2)}. Continue?'
               : 'This will create a non-monetary sanction record (${event.sanctionDescription}) for every student NOT in attendance. Continue?',
         ),
         actions: [
@@ -119,7 +119,7 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$count sanction record(s) created for absent students.'),
+          content: Text('$count sanction record(s) created for absent students.', style: const TextStyle(color: Colors.white)),
           backgroundColor: count > 0 ? TraceColors.error : TraceColors.medGrey,
         ),
       );
@@ -155,8 +155,8 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$count contribution record(s) created for students.'),
-          backgroundColor: TraceColors.navyBlue,
+          content: Text('$count contribution record(s) created for students.', style: const TextStyle(color: Colors.white)),
+          backgroundColor: TraceColors.success,
         ),
       );
     }
@@ -243,8 +243,8 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Student marked as $status.'),
-            backgroundColor: TraceColors.navyBlue,
+            content: Text('Student marked as $status.', style: const TextStyle(color: Colors.white)),
+            backgroundColor: TraceColors.success,
           ),
         );
       }
@@ -252,7 +252,7 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: TraceColors.error),
+          SnackBar(content: Text('Error: $e', style: const TextStyle(color: Colors.white)), backgroundColor: TraceColors.error),
         );
       }
       setState(() => _isLoading = false);
@@ -326,8 +326,8 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('$count students marked as $status.'),
-              backgroundColor: TraceColors.navyBlue,
+              content: Text('$count students marked as $status.', style: const TextStyle(color: Colors.white)),
+              backgroundColor: TraceColors.success,
             ),
           );
         }
@@ -335,7 +335,7 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('All students already have attendance records.')),
+            const SnackBar(content: Text('All students already have attendance records.', style: TextStyle(color: Colors.white)), backgroundColor: TraceColors.medGrey),
           );
         }
       }
@@ -343,7 +343,7 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text('Error: $e', style: const TextStyle(color: Colors.white)),
             backgroundColor: TraceColors.error,
           ),
         );
@@ -572,7 +572,7 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
                                   (_event!.sanctionDescription?.isNotEmpty ?? false))
                                 PopupMenuItem(
                                   value: 'sanctions',
-                                  child: Text('Apply Sanctions to Absentees', style: GoogleFonts.inter(fontSize: 13, color: TraceColors.error)),
+                                  child: Text('Generate Sanctions (Absent/Incomplete/Late)', style: GoogleFonts.inter(fontSize: 13, color: TraceColors.error)),
                                 ),
                               if ((_event!.eventContribution ?? 0) > 0)
                                 PopupMenuItem(

@@ -14,6 +14,8 @@ class Attendance {
   final DateTime? timeInPm;
   final DateTime? timeOutPm;
 
+  final double? manualLateHours;
+
   final String finalStatus;
 
   Attendance({
@@ -26,6 +28,7 @@ class Attendance {
     this.timeOutAm,
     this.timeInPm,
     this.timeOutPm,
+    this.manualLateHours,
     required this.finalStatus,
   });
 
@@ -50,6 +53,9 @@ class Attendance {
       timeOutPm: data['time_out_pm'] != null
           ? (data['time_out_pm'] as dynamic).toDate()
           : null,
+      manualLateHours: data['manual_late_hours'] != null
+          ? (data['manual_late_hours'] as num).toDouble()
+          : null,
       finalStatus: data['final_status'] ?? 'Incomplete',
     );
   }
@@ -64,6 +70,7 @@ class Attendance {
       'time_out_am': timeOutAm,
       'time_in_pm': timeInPm,
       'time_out_pm': timeOutPm,
+      if (manualLateHours != null) 'manual_late_hours': manualLateHours,
       'final_status': finalStatus,
     };
   }
@@ -235,7 +242,20 @@ class DetailedAttendance {
       if (hasVoidSession) {
         computedOverallStatus = 'Void';
       } else if (allMissed) {
-        computedOverallStatus = 'Absent';
+        // If there are no scan timestamps, this record was manually created by an admin.
+        // We must respect the manually assigned status.
+        computedOverallStatus = a.finalStatus;
+        if (a.finalStatus == 'Present' || a.finalStatus == 'Excused') {
+          completedDuration = totalEventDuration;
+          missedDuration = Duration.zero;
+        } else if (a.finalStatus == 'Late' && a.manualLateHours != null) {
+          missedDuration = Duration(minutes: (a.manualLateHours! * 60).round());
+          completedDuration = totalEventDuration - missedDuration;
+          if (completedDuration.isNegative) completedDuration = Duration.zero;
+        } else if (a.finalStatus == 'Absent' || a.finalStatus == 'Incomplete') {
+          missedDuration = totalEventDuration;
+          completedDuration = Duration.zero;
+        }
       } else if (hasMissedSession || completedDuration < totalEventDuration) {
         computedOverallStatus = 'Incomplete';
       } else if (hasLateSession) {
@@ -244,7 +264,17 @@ class DetailedAttendance {
         computedOverallStatus = 'Present';
       }
     } else {
-      if (hasMissedSession) {
+      if (allMissed && ['Present', 'Excused', 'Late', 'Absent'].contains(a.finalStatus)) {
+         computedOverallStatus = a.finalStatus;
+         if (a.finalStatus == 'Present' || a.finalStatus == 'Excused') {
+           completedDuration = totalEventDuration;
+           missedDuration = Duration.zero;
+         } else if (a.finalStatus == 'Late' && a.manualLateHours != null) {
+           missedDuration = Duration(minutes: (a.manualLateHours! * 60).round());
+           completedDuration = totalEventDuration - missedDuration;
+           if (completedDuration.isNegative) completedDuration = Duration.zero;
+         }
+      } else if (hasMissedSession) {
          computedOverallStatus = 'Incomplete';
       }
     }

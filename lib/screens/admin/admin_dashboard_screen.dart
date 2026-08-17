@@ -113,7 +113,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     _fundsStream = FirestoreService.db
         .collection('funds')
         .orderBy('date', descending: true)
-        .snapshots();
+        .snapshots(includeMetadataChanges: true);
   }
 
   @override
@@ -247,7 +247,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
               StreamBuilder<DocumentSnapshot>(
                 stream: FirestoreService.admins
                     .doc(authService.currentUser?.uid)
-                    .snapshots(),
+                    .snapshots(includeMetadataChanges: true),
                 builder: (context, snapshot) {
                   String? b64;
                   if (snapshot.hasData && snapshot.data!.exists) {
@@ -463,7 +463,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
       stream: FirestoreService.db
           .collection('id_claims')
           .orderBy('submitted_at', descending: true)
-          .snapshots(),
+          .snapshots(includeMetadataChanges: true),
       builder: (ctx, snap) {
         if (!snap.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -1184,7 +1184,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                       stream: FirestoreService.db
                           .collection('events')
                           .orderBy('date', descending: true)
-                          .snapshots(),
+                          .snapshots(includeMetadataChanges: true),
                       builder: (ctx, snap) {
                         if (!snap.hasData) {
                           return const CircularProgressIndicator();
@@ -1565,7 +1565,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                     stream: FirestoreService.db
                         .collection('events')
                         .orderBy('date', descending: true)
-                        .snapshots(),
+                        .snapshots(includeMetadataChanges: true),
                     builder: (ctx, snap) {
                       if (!snap.hasData) return const SizedBox();
                       final events = snap.data!.docs;
@@ -2077,7 +2077,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
             stream: FirestoreService.db
                 .collection('students')
                 .orderBy('registered_at', descending: true)
-                .snapshots(),
+                .snapshots(includeMetadataChanges: true),
             builder: (ctx, snap) {
               if (!snap.hasData) {
                 return const Center(child: CircularProgressIndicator());

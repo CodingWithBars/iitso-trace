@@ -16,7 +16,7 @@ class StudentsListScreen extends StatefulWidget {
 }
 
 class _StudentsListScreenState extends State<StudentsListScreen> {
-  final Stream<QuerySnapshot> _studentsStream = FirestoreService.db.collection('students').snapshots();
+  final Stream<QuerySnapshot> _studentsStream = FirestoreService.db.collection('students').snapshots(includeMetadataChanges: true);
 
   String _selectedYear = 'All';
   String _selectedSection = 'All';

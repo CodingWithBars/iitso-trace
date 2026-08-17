@@ -204,8 +204,51 @@ class _ScannerScreenState extends State<ScannerScreen>
       }
       // Auto-select the correct phase based on current time
       _autoDetectPhase();
+
+      // Auto-download offline data in the background when online,
+      // so it's cached and ready before the internet drops.
+      if (!NetworkService().isOffline && !_autoDownloading) {
+        _autoDownloadInBackground();
+      }
     } else {
       setState(() => _selectedEvent = null);
+    }
+  }
+
+  /// Silently downloads offline data in the background (no UI spinners).
+  /// Only runs once per scanner session.
+  Future<void> _autoDownloadInBackground() async {
+    if (_selectedEvent == null || _autoDownloading) return;
+    _autoDownloading = true;
+    try {
+      final stSnap = await FirestoreService.students.get();
+      final atSnap = await FirestoreService.attendance
+          .where('event_id', isEqualTo: _selectedEvent!.id)
+          .get();
+
+      final students = stSnap.docs
+          .map((d) => Student.fromMap(d.data() as Map<String, dynamic>, d.id))
+          .toList();
+      final attendance = {
+        for (var d in atSnap.docs) d.id: d.data() as Map<String, dynamic>,
+      };
+
+      // Persist to local cache
+      await OfflineCacheService.saveOfflineScannerData(
+        eventId: _selectedEvent!.id,
+        students: students,
+        attendance: attendance,
+      );
+      final syncTime = await OfflineCacheService.getLastSyncTime(_selectedEvent!.id);
+
+      if (!mounted) return;
+      setState(() {
+        _offlineStudents = students;
+        _offlineAttendance = attendance;
+        _lastSyncTime = syncTime;
+      });
+    } catch (e) {
+      debugPrint('Auto-download offline data failed: $e');
     }
   }
 
