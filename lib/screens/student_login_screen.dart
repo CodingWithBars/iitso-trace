@@ -299,7 +299,7 @@ class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          _isAdmin ? 'Admin Portal' : 'View My ID',
+                          _isAdmin ? 'Admin Portal' : 'Student Portal',
                           style: GoogleFonts.inter(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -413,8 +413,9 @@ class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen> {
                               if (v == null || v.isEmpty) {
                                 return 'Email is required';
                               }
-                              if (!v.contains('@'))
+                              if (!v.contains('@')) {
                                 return 'Enter a valid email';
+                              }
                               return null;
                             },
                           ),
@@ -463,8 +464,9 @@ class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen> {
                               if (v == null || v.isEmpty) {
                                 return 'Email is required';
                               }
-                              if (!v.contains('@'))
+                              if (!v.contains('@')) {
                                 return 'Enter a valid email';
+                              }
                               return null;
                             },
                           ),

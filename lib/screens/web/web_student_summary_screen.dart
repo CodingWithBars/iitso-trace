@@ -10,7 +10,6 @@ import '../../models/student.dart';
 import '../../models/attendance.dart';
 import '../../models/event.dart';
 import '../../services/event_service.dart';
-import 'package:intl/intl.dart';
 import 'dart:convert';
 import '../student/student_finances_tab.dart';
 
@@ -53,7 +52,7 @@ class _WebStudentSummaryScreenState
       }
 
       final attendanceList = await StudentService.getAttendanceForStudent(
-        student.id,
+        student.studentId,
       );
 
       final events = await EventService.getAllEvents();
@@ -285,108 +284,7 @@ class _WebStudentSummaryScreenState
     );
   }
 
-  (Duration, Duration, Duration) _calculateDurations(
-    Attendance a,
-    Event? event,
-  ) {
-    if (event == null) return (Duration.zero, Duration.zero, Duration.zero);
 
-    Duration totalEventDuration = Duration.zero;
-    if (event.startTime != null &&
-        event.endTime != null &&
-        event.startTime!.isNotEmpty &&
-        event.endTime!.isNotEmpty) {
-      try {
-        final start = DateFormat('HH:mm').parse(event.startTime!);
-        final end = DateFormat('HH:mm').parse(event.endTime!);
-        totalEventDuration = end.difference(start);
-        if (totalEventDuration.isNegative) {
-          totalEventDuration += const Duration(hours: 24);
-        }
-
-        if (event.isWholeDay &&
-            event.morningTimeOut != null &&
-            event.afternoonTimeIn != null) {
-          try {
-            final mOut = DateFormat('HH:mm').parse(event.morningTimeOut!);
-            final aIn = DateFormat('HH:mm').parse(event.afternoonTimeIn!);
-            Duration breakDuration = aIn.difference(mOut);
-            if (!breakDuration.isNegative &&
-                breakDuration < totalEventDuration) {
-              totalEventDuration -= breakDuration;
-            }
-          } catch (_) {}
-        }
-      } catch (_) {}
-    }
-
-    DateTime now = DateTime.now();
-    DateTime eventDate = event.date;
-
-    DateTime? parseTime(String? tStr) {
-      if (tStr == null || tStr.isEmpty) return null;
-      try {
-        final t = DateFormat('h:mm a').parse(tStr);
-        return DateTime(
-          eventDate.year,
-          eventDate.month,
-          eventDate.day,
-          t.hour,
-          t.minute,
-        );
-      } catch (_) {
-        try {
-          final t = DateFormat('HH:mm').parse(tStr);
-          return DateTime(
-            eventDate.year,
-            eventDate.month,
-            eventDate.day,
-            t.hour,
-            t.minute,
-          );
-        } catch (_) {
-          return null;
-        }
-      }
-    }
-
-    DateTime? amEnd = parseTime(event.morningTimeOut ?? event.endTime);
-    DateTime? pmEnd = parseTime(event.afternoonTimeOut ?? event.endTime);
-
-    Duration amCompleted = Duration.zero;
-    if (a.timeInAm != null) {
-      if (a.timeOutAm != null) {
-        amCompleted = a.timeOutAm!.difference(a.timeInAm!);
-      } else {
-        if (amEnd != null && now.isAfter(amEnd)) {
-          amCompleted = Duration.zero;
-        } else {
-          amCompleted = now.difference(a.timeInAm!);
-        }
-      }
-    }
-    if (amCompleted.isNegative) amCompleted = Duration.zero;
-
-    Duration pmCompleted = Duration.zero;
-    if (a.timeInPm != null) {
-      if (a.timeOutPm != null) {
-        pmCompleted = a.timeOutPm!.difference(a.timeInPm!);
-      } else {
-        if (pmEnd != null && now.isAfter(pmEnd)) {
-          pmCompleted = Duration.zero;
-        } else {
-          pmCompleted = now.difference(a.timeInPm!);
-        }
-      }
-    }
-    if (pmCompleted.isNegative) pmCompleted = Duration.zero;
-
-    Duration completedDuration = amCompleted + pmCompleted;
-    Duration missedDuration = totalEventDuration - completedDuration;
-    if (missedDuration.isNegative) missedDuration = Duration.zero;
-
-    return (totalEventDuration, completedDuration, missedDuration);
-  }
 
   Widget _buildStatsTriangle() {
     Duration totalEventDurationAll = Duration.zero;
@@ -397,10 +295,10 @@ class _WebStudentSummaryScreenState
       final event = _events[a.eventId];
       if (event == null) continue;
 
-      final (total, completed, missed) = _calculateDurations(a, event);
-      totalEventDurationAll += total;
-      completedDurationAll += completed;
-      missedDurationAll += missed;
+      final det = DetailedAttendance.calculate(a, event);
+      totalEventDurationAll += det.totalEventDuration;
+      completedDurationAll += det.completedDuration;
+      missedDurationAll += det.missedDuration;
     }
 
     String fmt(Duration d) {
@@ -592,8 +490,7 @@ class _WebStudentSummaryScreenState
       builder: (ctx) {
         final event = _events[a.eventId];
 
-        final (totalEventDuration, completedDuration, missedDuration) =
-            _calculateDurations(a, event);
+        final det = DetailedAttendance.calculate(a, event);
 
         return Container(
           padding: const EdgeInsets.all(24),
@@ -635,14 +532,11 @@ class _WebStudentSummaryScreenState
                     ),
                   ),
                   const SizedBox(width: 12),
-                  StatusChip.fromStatus(a.finalStatus),
+                  StatusChip.fromStatus(DetailedAttendance.calculate(a, _events[a.eventId]).overallStatus),
                 ],
               ),
               const SizedBox(height: 24),
-              if (a.timeInAm != null ||
-                  a.timeOutAm != null ||
-                  a.timeInPm != null ||
-                  a.timeOutPm != null) ...[
+              if (det.sessions.isNotEmpty) ...[
                 Text(
                   'Attendance Logs',
                   style: GoogleFonts.inter(
@@ -651,21 +545,42 @@ class _WebStudentSummaryScreenState
                     color: TraceColors.navyBlue,
                   ),
                 ),
-                const SizedBox(height: 8),
-                if (event?.isWholeDay == true || event?.isAmOnly == true) ...[
-                  _buildTimeRow('Morning In:', a.timeInAm),
-                  _buildTimeRow('Morning Out:', a.timeOutAm),
-                ],
-                if (event?.isWholeDay == true || event?.isPmOnly == true) ...[
-                  _buildTimeRow('Afternoon In:', a.timeInPm),
-                  _buildTimeRow('Afternoon Out:', a.timeOutPm),
-                ],
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
+                ...det.sessions.map((s) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: TraceColors.offWhite,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: TraceColors.lightGrey.withValues(alpha: 0.5)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '${s.label} Session',
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: TraceColors.navyBlue,
+                              ),
+                            ),
+                            StatusChip.fromStatus(s.status),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        _buildTimeRow('Time In:', s.timeIn),
+                        _buildTimeRow('Time Out:', s.timeOut),
+                      ],
+                    ),
+                  );
+                }),
               ],
-              if (a.timeInAm == null &&
-                  a.timeOutAm == null &&
-                  a.timeInPm == null &&
-                  a.timeOutPm == null)
+              if (det.sessions.isEmpty)
                 Text(
                   'No time records available.',
                   style: GoogleFonts.inter(
@@ -687,17 +602,17 @@ class _WebStudentSummaryScreenState
               const SizedBox(height: 12),
               _buildDurationRow(
                 'Total Event Duration:',
-                totalEventDuration,
+                det.totalEventDuration,
                 TraceColors.medGrey,
               ),
               _buildDurationRow(
                 'Completed Hours:',
-                completedDuration,
+                det.completedDuration,
                 TraceColors.success,
               ),
               _buildDurationRow(
                 'Missed Hours:',
-                missedDuration,
+                det.missedDuration,
                 TraceColors.error,
               ),
               const SizedBox(height: 16),

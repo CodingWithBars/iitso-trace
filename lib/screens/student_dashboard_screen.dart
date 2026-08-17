@@ -69,7 +69,7 @@ class _StudentDashboardScreenState
       });
       return;
     }
-    final attendance = await StudentService.getAttendanceForStudent(student.id);
+    final attendance = await StudentService.getAttendanceForStudent(student.studentId);
     final obligations = await FinancialService.getObligationsForStudent(student.studentId);
 
     // FIX: batch-fetch all events with a single whereIn query instead of N individual gets

@@ -16,6 +16,8 @@ class StudentsListScreen extends StatefulWidget {
 }
 
 class _StudentsListScreenState extends State<StudentsListScreen> {
+  final Stream<QuerySnapshot> _studentsStream = FirestoreService.db.collection('students').snapshots();
+
   String _selectedYear = 'All';
   String _selectedSection = 'All';
   bool _sortAscending = true;
@@ -28,6 +30,9 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
     '4th Year',
   ];
   bool _isExporting = false;
+
+
+
 
   Future<void> _exportToExcel() async {
     setState(() => _isExporting = true);
@@ -210,7 +215,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
             // List
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
-                stream: FirestoreService.db.collection('students').snapshots(),
+                stream: _studentsStream,
                 builder: (ctx, snap) {
                   if (snap.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());

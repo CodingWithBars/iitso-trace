@@ -228,7 +228,7 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
       } else {
         final newData = <String, dynamic>{
           'event_id': _event!.id,
-          'student_id': sId,
+          'student_id': studentData['student_id'] ?? sId,
           'student_name': studentData['name'] ?? 'Unknown',
           'event_name': _eventName,
           'final_status': status,
@@ -301,13 +301,13 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
       for (var entry in _studentsMap.entries) {
         final sId = entry.key;
         final studentData = entry.value;
-        final att = _allAttendance.cast<Attendance?>().firstWhere((a) => a?.studentId == sId, orElse: () => null);
+        final att = _allAttendance.cast<Attendance?>().firstWhere((a) => a?.studentId == (studentData['student_id'] ?? sId), orElse: () => null);
         
         if (att == null) {
           final docRef = FirebaseFirestore.instance.collection('attendance').doc();
           final newData = <String, dynamic>{
             'event_id': _event!.id,
-            'student_id': sId,
+            'student_id': studentData['student_id'] ?? sId,
             'student_name': studentData['name'] ?? 'Unknown',
             'event_name': _eventName,
             'final_status': status,
@@ -387,13 +387,13 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
     for (var entry in _studentsMap.entries) {
       final sId = entry.key;
       final studentData = entry.value;
-      final att = _allAttendance.cast<Attendance?>().firstWhere((a) => a!.studentId == sId, orElse: () => null);
+      final att = _allAttendance.cast<Attendance?>().firstWhere((a) => a!.studentId == (studentData['student_id'] ?? sId), orElse: () => null);
 
       final isPresent = att != null;
 
       final attStatus = isPresent 
           ? att.finalStatus.toLowerCase() 
-          : (_event?.computedStatus == 'upcoming' ? 'pending' : 'absent');
+          : ((_event?.computedStatus == 'upcoming' || _event?.computedStatus == 'ongoing') ? 'pending' : 'absent');
 
       if (_statusFilter != 'All') {
         if (_statusFilter == 'Pending' && attStatus != 'pending') continue;
@@ -826,8 +826,8 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
                                   final String statusText;
                                   final Color statusColor;
                                   if (isAbsent) {
-                                    statusText = _event?.computedStatus == 'upcoming' ? 'PENDING' : 'ABSENT';
-                                    statusColor = _event?.computedStatus == 'upcoming' ? Colors.grey : TraceColors.error;
+                                    statusText = (_event?.computedStatus == 'upcoming' || _event?.computedStatus == 'ongoing') ? 'PENDING' : 'ABSENT';
+                                    statusColor = (_event?.computedStatus == 'upcoming' || _event?.computedStatus == 'ongoing') ? Colors.grey : TraceColors.error;
                                   } else {
                                     statusText = (item.attendance?.finalStatus.toUpperCase() ?? 'PRESENT');
                                     switch (statusText) {

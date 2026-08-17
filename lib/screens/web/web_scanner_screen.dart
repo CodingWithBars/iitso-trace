@@ -39,6 +39,7 @@ class _WebScannerScreenState extends State<WebScannerScreen>
   List<Event> _activeEvents = [];
   bool _loadingEvents = true;
   ScanPhase _manualPhase = ScanPhase.timeInAm;
+  bool _isSuperAdmin = false;
 
   @override
   void initState() {
@@ -53,6 +54,26 @@ class _WebScannerScreenState extends State<WebScannerScreen>
     );
     _syncTime();
     _loadEvents();
+    _checkRole();
+  }
+
+  Future<void> _checkRole() async {
+    final user = AuthService().currentUser;
+    if (user != null) {
+      if (user.email?.toLowerCase() == 'iitsoofficer@dorsu.bc') {
+        if (mounted) setState(() => _isSuperAdmin = true);
+        return;
+      }
+      try {
+        final doc = await FirebaseFirestore.instance.collection('admins').doc(user.uid).get();
+        if (doc.exists) {
+          final role = doc.data()?['role']?.toString().toLowerCase();
+          if (role == 'superadmin') {
+            if (mounted) setState(() => _isSuperAdmin = true);
+          }
+        }
+      } catch (_) {}
+    }
   }
 
   Future<void> _syncTime() async {
@@ -708,7 +729,7 @@ class _WebScannerScreenState extends State<WebScannerScreen>
                         ],
                       ),
                     ),
-                    if (_selectedEvent != null)
+                    if (_selectedEvent != null && _isSuperAdmin)
                       Row(
                         children: [
                           if (_selectedEvent?.timeInClosed != true) ...[

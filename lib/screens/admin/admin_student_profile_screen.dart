@@ -5,6 +5,11 @@ import 'package:go_router/go_router.dart';
 import 'dart:convert';
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
+import '../../services/student_service.dart';
+import '../../services/event_service.dart';
+import '../../models/attendance.dart';
+import '../../models/event.dart';
+import '../../widgets/shared_widgets.dart';
 
 class AdminStudentProfileScreen extends StatelessWidget {
   final String studentId;
@@ -275,17 +280,41 @@ class AdminStudentProfileScreen extends StatelessWidget {
     );
   }
 
+  String _formatDuration(Duration d) {
+    final hours = d.inHours;
+    final mins = d.inMinutes.remainder(60);
+    if (hours == 0 && mins == 0) return '0h';
+    if (hours == 0) return '${mins}m';
+    if (mins == 0) return '${hours}h';
+    return '${hours}h ${mins}m';
+  }
+
   Widget _buildAttendanceList() {
-    return FutureBuilder<QuerySnapshot>(
-      future: FirestoreService.db
-          .collection('attendance')
-          .where('student_id', isEqualTo: studentId)
-          .get(),
+    return FutureBuilder(
+      future: Future.wait([
+        StudentService.getAttendanceForStudent(studentId),
+        EventService.getAllEvents(),
+      ]),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'Error loading attendance: ${snapshot.error}',
+              style: GoogleFonts.inter(color: TraceColors.error),
+            ),
+          );
+        }
+
+        final data = snapshot.data as List;
+        final attendances = data[0] as List<Attendance>;
+        final eventsList = data[1] as List<Event>;
+        final eventsMap = {for (var e in eventsList) e.id: e};
+
+        if (attendances.isEmpty) {
           return Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
@@ -302,27 +331,19 @@ class AdminStudentProfileScreen extends StatelessWidget {
           );
         }
 
-        final docs = snapshot.data!.docs;
         return ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: docs.length,
+          itemCount: attendances.length,
           itemBuilder: (ctx, i) {
-            final data = docs[i].data() as Map<String, dynamic>;
-            final eventId = data['event_id'] ?? 'Unknown Event';
-            final status = data['status'] ?? 'Unknown';
+            final a = attendances[i];
+            final event = eventsMap[a.eventId];
+            final eventName = event?.eventName ?? a.eventName;
 
-            Color statusColor;
-            if (status == 'Present') {
-              statusColor = TraceColors.success;
-            } else if (status == 'Half-Day' || status.contains('Partial')) {
-              statusColor = TraceColors.warning;
-            } else {
-              statusColor = TraceColors.error;
-            }
+            final det = DetailedAttendance.calculate(a, event);
 
             return Container(
-              margin: const EdgeInsets.only(bottom: 8),
+              margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -335,31 +356,82 @@ class AdminStudentProfileScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      'Event ID: $eventId',
-                      style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w600,
-                        color: TraceColors.navyBlue,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          eventName,
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            color: TraceColors.navyBlue,
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      StatusChip.fromStatus(det.overallStatus),
+                    ],
                   ),
+                  const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
+                      color: TraceColors.navyBlue.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(
-                      status.toUpperCase(),
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: statusColor,
-                      ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Time Spent',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: TraceColors.medGrey,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _formatDuration(det.completedDuration),
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: TraceColors.success,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              'Missed',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: TraceColors.medGrey,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _formatDuration(det.missedDuration),
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: det.missedDuration.inMinutes > 0
+                                    ? TraceColors.error
+                                    : TraceColors.success,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ],

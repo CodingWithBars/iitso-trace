@@ -325,7 +325,7 @@ class _AnnouncementDetailsScreenState extends ConsumerState<AnnouncementDetailsS
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: comments.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 16),
+                        separatorBuilder: (context, index) => const SizedBox(height: 16),
                         itemBuilder: (context, index) {
                           final c = comments[index];
                           return Container(

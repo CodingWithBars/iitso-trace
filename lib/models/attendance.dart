@@ -1,3 +1,6 @@
+import 'package:intl/intl.dart';
+import 'event.dart';
+
 class Attendance {
   final String id;
   final String eventId;
@@ -63,5 +66,188 @@ class Attendance {
       'time_out_pm': timeOutPm,
       'final_status': finalStatus,
     };
+  }
+}
+
+class SessionDetails {
+  final String label;
+  final String status;
+  final DateTime? timeIn;
+  final DateTime? timeOut;
+
+  SessionDetails({
+    required this.label,
+    required this.status,
+    this.timeIn,
+    this.timeOut,
+  });
+}
+
+
+
+class DetailedAttendance {
+  final String overallStatus;
+  final List<SessionDetails> sessions;
+  final Duration totalEventDuration;
+  final Duration completedDuration;
+  final Duration missedDuration;
+
+  DetailedAttendance({
+    required this.overallStatus,
+    required this.sessions,
+    required this.totalEventDuration,
+    required this.completedDuration,
+    required this.missedDuration,
+  });
+
+  static DetailedAttendance calculate(Attendance a, Event? event) {
+    if (event == null) {
+      return DetailedAttendance(
+        overallStatus: a.finalStatus,
+        sessions: [],
+        totalEventDuration: Duration.zero,
+        completedDuration: Duration.zero,
+        missedDuration: Duration.zero,
+      );
+    }
+
+    DateTime now = DateTime.now();
+    DateTime eventDate = event.date;
+
+    DateTime? parseTime(String? tStr) {
+      if (tStr == null || tStr.isEmpty) return null;
+      try {
+        final t = DateFormat('h:mm a').parse(tStr);
+        return DateTime(eventDate.year, eventDate.month, eventDate.day, t.hour, t.minute);
+      } catch (_) {
+        try {
+          final t = DateFormat('HH:mm').parse(tStr);
+          return DateTime(eventDate.year, eventDate.month, eventDate.day, t.hour, t.minute);
+        } catch (_) {
+          return null;
+        }
+      }
+    }
+
+    final scheduledAmIn = parseTime(event.morningTimeIn);
+    final scheduledAmOut = parseTime(event.morningTimeOut);
+    final scheduledPmIn = parseTime(event.afternoonTimeIn);
+    final scheduledPmOut = parseTime(event.afternoonTimeOut);
+
+    Duration totalEventDuration = Duration.zero;
+    if (event.startTime != null && event.endTime != null && event.startTime!.isNotEmpty && event.endTime!.isNotEmpty) {
+      final start = parseTime(event.startTime);
+      final end = parseTime(event.endTime);
+      
+      if (start != null && end != null) {
+        totalEventDuration = end.difference(start);
+        if (totalEventDuration.isNegative) totalEventDuration += const Duration(hours: 24);
+
+        if (event.isWholeDay && scheduledAmOut != null && scheduledPmIn != null) {
+          Duration breakDuration = scheduledPmIn.difference(scheduledAmOut);
+          if (!breakDuration.isNegative && breakDuration < totalEventDuration) {
+            totalEventDuration -= breakDuration;
+          }
+        }
+      }
+    }
+
+    String determineSessionStatus(DateTime? scheduledIn, DateTime? scheduledOut, DateTime? actualIn, DateTime? actualOut) {
+      if (scheduledIn == null) return 'N/A';
+      
+      if (actualIn != null) {
+        final diff = actualIn.difference(scheduledIn).inMinutes;
+        return diff > 15 ? 'Late' : 'Present';
+      }
+
+      final checkTime = scheduledOut ?? scheduledIn.add(const Duration(hours: 4)); 
+      if (now.isAfter(checkTime)) {
+        return 'Missed';
+      }
+      return 'Pending';
+    }
+
+    List<SessionDetails> sessions = [];
+    if (event.isWholeDay || event.isAmOnly) {
+      sessions.add(SessionDetails(
+        label: 'Morning',
+        status: determineSessionStatus(scheduledAmIn, scheduledAmOut, a.timeInAm, a.timeOutAm),
+        timeIn: a.timeInAm,
+        timeOut: a.timeOutAm,
+      ));
+    }
+    if (event.isWholeDay || event.isPmOnly) {
+      sessions.add(SessionDetails(
+        label: 'Afternoon',
+        status: determineSessionStatus(scheduledPmIn, scheduledPmOut, a.timeInPm, a.timeOutPm),
+        timeIn: a.timeInPm,
+        timeOut: a.timeOutPm,
+      ));
+    }
+
+    DateTime? amEnd = scheduledAmOut ?? parseTime(event.endTime);
+    DateTime? pmEnd = scheduledPmOut ?? parseTime(event.endTime);
+
+    Duration amCompleted = Duration.zero;
+    if (a.timeInAm != null) {
+      if (a.timeOutAm != null) {
+        amCompleted = a.timeOutAm!.difference(a.timeInAm!);
+      } else {
+        if (amEnd != null && now.isAfter(amEnd)) {
+          amCompleted = Duration.zero;
+        } else {
+          amCompleted = now.difference(a.timeInAm!);
+        }
+      }
+    }
+    if (amCompleted.isNegative) amCompleted = Duration.zero;
+
+    Duration pmCompleted = Duration.zero;
+    if (a.timeInPm != null) {
+      if (a.timeOutPm != null) {
+        pmCompleted = a.timeOutPm!.difference(a.timeInPm!);
+      } else {
+        if (pmEnd != null && now.isAfter(pmEnd)) {
+          pmCompleted = Duration.zero;
+        } else {
+          pmCompleted = now.difference(a.timeInPm!);
+        }
+      }
+    }
+    if (pmCompleted.isNegative) pmCompleted = Duration.zero;
+
+    Duration completedDuration = amCompleted + pmCompleted;
+    Duration missedDuration = totalEventDuration - completedDuration;
+    if (missedDuration.isNegative) missedDuration = Duration.zero;
+
+    String computedOverallStatus = a.finalStatus;
+    
+    bool hasMissedSession = sessions.any((s) => s.status == 'Missed');
+    bool hasLateSession = sessions.any((s) => s.status == 'Late');
+    bool allMissed = sessions.every((s) => s.status == 'Missed');
+    
+    if (event.computedStatus == 'completed') {
+      if (allMissed) {
+        computedOverallStatus = 'Absent';
+      } else if (hasMissedSession || completedDuration < totalEventDuration) {
+        computedOverallStatus = 'Incomplete';
+      } else if (hasLateSession) {
+        computedOverallStatus = (completedDuration < totalEventDuration) ? 'Incomplete' : 'Late';
+      } else {
+        computedOverallStatus = 'Present';
+      }
+    } else {
+      if (hasMissedSession) {
+         computedOverallStatus = 'Incomplete';
+      }
+    }
+
+    return DetailedAttendance(
+      overallStatus: computedOverallStatus.toUpperCase(),
+      sessions: sessions,
+      totalEventDuration: totalEventDuration,
+      completedDuration: completedDuration,
+      missedDuration: missedDuration,
+    );
   }
 }

@@ -106,7 +106,7 @@ class CsvReportService {
       
       final isAbsent = att == null;
       final status = isAbsent 
-          ? (computedEventStatus == 'upcoming' ? 'PENDING' : 'ABSENT')
+          ? ((computedEventStatus == 'upcoming' || computedEventStatus == 'ongoing') ? 'PENDING' : 'ABSENT')
           : (att.finalStatus.toUpperCase());
           
       final timeInAm = (att != null && att.timeInAm != null) ? timeFormat.format(att.timeInAm!) : '--';
