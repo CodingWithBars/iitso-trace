@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 import 'auth_service.dart';
 
 /// Background message handler — must be a top-level function
@@ -24,6 +26,7 @@ class NotificationService {
 
   /// Call once at app startup from main.dart
   static Future<void> initialize() async {
+    tz.initializeTimeZones();
     if (kIsWeb) return; // FCM web setup differs
 
     // Register background handler
@@ -144,6 +147,58 @@ class NotificationService {
       ),
       payload: payload,
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Scheduled Check-Out Reminders
+  // ---------------------------------------------------------------------------
+  static Future<void> scheduleCheckoutReminder({
+    required int id,
+    required String eventName,
+    required DateTime targetCheckoutTime,
+  }) async {
+    if (kIsWeb) return; // flutter_local_notifications has limited support on web
+    
+    final scheduleTime = targetCheckoutTime.subtract(const Duration(minutes: 5));
+    if (scheduleTime.isBefore(DateTime.now())) return; // Already past 5-min warning
+
+    try {
+      await _localNotifications.zonedSchedule(
+        id: id,
+        title: 'Event Checkout Reminder',
+        body: 'Your event ($eventName) is ending in 5 minutes! Time-out now or your hours will be voided.',
+        scheduledDate: tz.TZDateTime.from(scheduleTime, tz.local),
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(
+            _androidChannel.id,
+            _androidChannel.name,
+            channelDescription: _androidChannel.description,
+            importance: Importance.max,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+          ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      );
+      debugPrint('[LocalNotifications] Scheduled reminder for event "$eventName" at $scheduleTime');
+    } catch (e) {
+      debugPrint('[LocalNotifications] Failed to schedule reminder: $e');
+    }
+  }
+
+  static Future<void> cancelCheckoutReminder(int id) async {
+    if (kIsWeb) return;
+    try {
+      await _localNotifications.cancel(id: id);
+      debugPrint('[LocalNotifications] Cancelled reminder ID $id');
+    } catch (e) {
+      debugPrint('[LocalNotifications] Failed to cancel reminder: $e');
+    }
   }
 
   // ---------------------------------------------------------------------------

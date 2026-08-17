@@ -155,13 +155,17 @@ class DetailedAttendance {
     String determineSessionStatus(DateTime? scheduledIn, DateTime? scheduledOut, DateTime? actualIn, DateTime? actualOut) {
       if (scheduledIn == null) return 'N/A';
       
+      final checkOutTime = scheduledOut ?? scheduledIn.add(const Duration(hours: 4));
+
       if (actualIn != null) {
+        if (actualOut == null && (now.isAfter(checkOutTime) || event.status == 'completed' || event.status == 'archived')) {
+          return 'Void'; // Enforce accountability: no checkout = void
+        }
         final diff = actualIn.difference(scheduledIn).inMinutes;
         return diff > 15 ? 'Late' : 'Present';
       }
 
-      final checkTime = scheduledOut ?? scheduledIn.add(const Duration(hours: 4)); 
-      if (now.isAfter(checkTime)) {
+      if (now.isAfter(checkOutTime) || event.status == 'completed' || event.status == 'archived') {
         return 'Missed';
       }
       return 'Pending';
@@ -224,10 +228,13 @@ class DetailedAttendance {
     
     bool hasMissedSession = sessions.any((s) => s.status == 'Missed');
     bool hasLateSession = sessions.any((s) => s.status == 'Late');
+    bool hasVoidSession = sessions.any((s) => s.status == 'Void');
     bool allMissed = sessions.every((s) => s.status == 'Missed');
     
-    if (event.computedStatus == 'completed') {
-      if (allMissed) {
+    if (event.computedStatus == 'completed' || hasVoidSession) {
+      if (hasVoidSession) {
+        computedOverallStatus = 'Void';
+      } else if (allMissed) {
         computedOverallStatus = 'Absent';
       } else if (hasMissedSession || completedDuration < totalEventDuration) {
         computedOverallStatus = 'Incomplete';

@@ -15,6 +15,7 @@ import '../services/auth_service.dart';
 import '../services/financial_service.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
+import '../services/checkout_warning_service.dart';
 
 class StudentDashboardScreen extends ConsumerStatefulWidget {
   final String? initialStudentId;
@@ -342,8 +343,15 @@ class _StudentDashboardScreenState
         .toList();
     final currency = NumberFormat.currency(symbol: '₱', decimalDigits: 2);
 
+    final pendingCheckout = CheckoutWarningService.checkPendingCheckout(_attendanceList, _eventsMap);
+    Widget? warningBanner;
+    if (pendingCheckout != null) {
+      warningBanner = CheckoutWarningService.processWarning(context, pendingCheckout);
+    }
+
     return Column(
       children: [
+        if (warningBanner != null) warningBanner,
         // Student info card
         Container(
           padding: const EdgeInsets.all(20),

@@ -138,7 +138,7 @@ class _WebScannerScreenState extends State<WebScannerScreen>
       if (finalOut != null &&
           now.isAfter(finalOut.add(const Duration(hours: 1)))) {
         // Event has expired by 1 hour past its final time out
-        await EventService.updateEvent(e.id, {'status': 'completed'});
+        EventService.updateEvent(e.id, {'status': 'completed'}); // non-blocking
         continue;
       }
 

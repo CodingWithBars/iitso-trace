@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'dart:convert';
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
@@ -289,6 +290,198 @@ class AdminStudentProfileScreen extends StatelessWidget {
     return '${hours}h ${mins}m';
   }
 
+  String _fmt(DateTime t) {
+    return DateFormat('hh:mm a').format(t);
+  }
+
+  void _showAttendanceDetails(BuildContext context, Attendance a, Event? event) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        final det = DetailedAttendance.calculate(a, event);
+
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: const BoxDecoration(
+            color: TraceColors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: TraceColors.lightGrey,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                a.eventName,
+                style: GoogleFonts.inter(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: TraceColors.navyBlue,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text(
+                    'Overall Status:',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: TraceColors.medGrey,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  StatusChip.fromStatus(det.overallStatus),
+                ],
+              ),
+              const SizedBox(height: 24),
+              if (det.sessions.isNotEmpty) ...[
+                Text(
+                  'Attendance Logs',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: TraceColors.navyBlue,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ...det.sessions.map((s) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: TraceColors.offWhite,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: TraceColors.lightGrey.withValues(alpha: 0.5)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '${s.label} Session',
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: TraceColors.navyBlue,
+                              ),
+                            ),
+                            StatusChip.fromStatus(s.status),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        _buildTimeRow('Time In:', s.timeIn),
+                        _buildTimeRow('Time Out:', s.timeOut),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+              if (det.sessions.isEmpty)
+                Text(
+                  'No time records available.',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    color: TraceColors.medGrey,
+                  ),
+                ),
+              const SizedBox(height: 16),
+              const Divider(color: TraceColors.lightGrey),
+              const SizedBox(height: 16),
+              Text(
+                'Duration Summary',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: TraceColors.navyBlue,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildDurationRow(
+                'Total Event Duration:',
+                det.totalEventDuration,
+                TraceColors.medGrey,
+              ),
+              _buildDurationRow(
+                'Completed Hours:',
+                det.completedDuration,
+                TraceColors.success,
+              ),
+              _buildDurationRow(
+                'Missed Hours:',
+                det.missedDuration,
+                TraceColors.error,
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDurationRow(String label, Duration duration, Color color) {
+    final hours = duration.inHours;
+    final mins = duration.inMinutes.remainder(60);
+    final text = '${hours}h ${mins}m';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.inter(fontSize: 14, color: TraceColors.medGrey),
+          ),
+          Text(
+            text,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimeRow(String label, DateTime? time) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.inter(fontSize: 14, color: TraceColors.medGrey),
+          ),
+          Text(
+            time != null ? _fmt(time) : '--:--',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: TraceColors.navyBlue,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAttendanceList() {
     return FutureBuilder(
       future: Future.wait([
@@ -342,21 +535,23 @@ class AdminStudentProfileScreen extends StatelessWidget {
 
             final det = DetailedAttendance.calculate(a, event);
 
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
+            return GestureDetector(
+              onTap: () => _showAttendanceDetails(context, a, event),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
@@ -436,7 +631,8 @@ class AdminStudentProfileScreen extends StatelessWidget {
                   ),
                 ],
               ),
-            );
+            ),
+          );
           },
         );
       },

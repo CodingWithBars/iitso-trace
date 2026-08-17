@@ -1,11 +1,16 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../theme/app_theme.dart';
 import '../widgets/shared_widgets.dart';
 import '../services/student_service.dart';
@@ -24,6 +29,7 @@ class StudentIdScreen extends ConsumerStatefulWidget {
 class _StudentIdScreenState extends ConsumerState<StudentIdScreen> {
   Student? _student;
   bool _isLoading = true;
+  final GlobalKey _qrKey = GlobalKey();
 
   @override
   void initState() {
@@ -45,7 +51,7 @@ class _StudentIdScreenState extends ConsumerState<StudentIdScreen> {
 
   void _openEditProfile() {
     if (_student == null) return;
-    
+
     if (NetworkService().isOffline) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -70,6 +76,52 @@ class _StudentIdScreenState extends ConsumerState<StudentIdScreen> {
   void _logout() {
     ref.read(studentSessionProvider.notifier).logout();
     context.go('/');
+  }
+
+  Future<void> _shareQrCode() async {
+    try {
+      RenderRepaintBoundary boundary =
+          _qrKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+          
+      if (boundary.debugNeedsPaint) {
+        await Future.delayed(const Duration(milliseconds: 20));
+        return _shareQrCode();
+      }
+      
+      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      ByteData? byteData = await image.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
+      if (byteData != null) {
+        final buffer = byteData.buffer.asUint8List();
+        final directory = await getTemporaryDirectory();
+        final file = File(
+          '${directory.path}/Trace_ID_${_student!.studentId}.png',
+        );
+        await file.writeAsBytes(buffer);
+
+        if (mounted) {
+          final box = context.findRenderObject() as RenderBox?;
+          await Share.shareXFiles(
+            [XFile(file.path)],
+            text: 'My Trace QR Code ID',
+            sharePositionOrigin: box!.localToGlobal(Offset.zero) & box.size,
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to save QR code: $e',
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.red.shade800,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -132,13 +184,38 @@ class _StudentIdScreenState extends ConsumerState<StudentIdScreen> {
               child: CustomScrollView(
                 slivers: [
                   SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 20,
+                    ),
                     sliver: SliverFillRemaining(
                       hasScrollBody: false,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Expanded(child: _buildIdCard()),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: GoldButton(
+                                  label: 'Download QR',
+                                  icon: Icons.share_rounded,
+                                  onPressed: _shareQrCode,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: GoldButton(
+                                  label: 'Attendance',
+                                  icon: Icons.analytics_outlined,
+                                  onPressed: () => context.push(
+                                    '/student/summary/${_student!.studentId}',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                           _buildNoteWidget(),
                         ],
                       ),
@@ -156,135 +233,128 @@ class _StudentIdScreenState extends ConsumerState<StudentIdScreen> {
   Widget _buildIdCard() {
     return Stack(
       children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: TraceColors.gold, width: 2),
-            boxShadow: [
-              BoxShadow(
-                color: TraceColors.navyBlue.withValues(alpha: 0.15),
-                blurRadius: 30,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 96,
-                    height: 96,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: TraceColors.gold, width: 3),
-                      color: TraceColors.offWhite,
+        RepaintBoundary(
+          key: _qrKey,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: TraceColors.gold, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: TraceColors.navyBlue.withValues(alpha: 0.15),
+                  blurRadius: 30,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 96,
+                      height: 96,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: TraceColors.gold, width: 3),
+                        color: TraceColors.offWhite,
+                      ),
+                      child: ClipOval(
+                        child: _buildAvatarWidget(_student!.avatarUrl),
+                      ),
                     ),
-                    child: ClipOval(
-                      child: _buildAvatarWidget(_student!.avatarUrl),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _student!.name.toUpperCase(),
+                            style: GoogleFonts.inter(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: TraceColors.navyBlue,
+                              height: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            '${_student!.course} - ${_student!.yearLevel}${_student!.section.isNotEmpty ? ' - Sec ${_student!.section}' : ''}',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: TraceColors.medGrey,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _student!.name.toUpperCase(),
-                          style: GoogleFonts.inter(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Divider(color: TraceColors.lightGrey),
+                const Spacer(flex: 1),
+                Expanded(
+                  flex: 4,
+                  child: Center(
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        maxWidth: 288,
+                        maxHeight: 288,
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: TraceColors.lightGrey.withValues(alpha: 0.5),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: AspectRatio(
+                        aspectRatio: 1.0,
+                        child: QrImageView(
+                          data: _student!.qrHash,
+                          version: QrVersions.auto,
+                          eyeStyle: const QrEyeStyle(
+                            eyeShape: QrEyeShape.square,
                             color: TraceColors.navyBlue,
-                            height: 1.2,
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          '${_student!.course} - ${_student!.yearLevel}${_student!.section.isNotEmpty ? ' - Sec ${_student!.section}' : ''}',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: TraceColors.medGrey,
+                          dataModuleStyle: const QrDataModuleStyle(
+                            dataModuleShape: QrDataModuleShape.circle,
+                            color: TraceColors.navyBlue,
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Divider(color: TraceColors.lightGrey),
-              const Spacer(flex: 1),
-              Expanded(
-                flex: 4,
-                child: Center(
-                  child: Container(
-                    constraints: const BoxConstraints(
-                      maxWidth: 288,
-                      maxHeight: 288,
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: TraceColors.lightGrey.withValues(alpha: 0.5),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: AspectRatio(
-                      aspectRatio: 1.0,
-                      child: QrImageView(
-                        data: _student!.qrHash,
-                        version: QrVersions.auto,
-                        eyeStyle: const QrEyeStyle(
-                          eyeShape: QrEyeShape.square,
-                          color: TraceColors.navyBlue,
-                        ),
-                        dataModuleStyle: const QrDataModuleStyle(
-                          dataModuleShape: QrDataModuleShape.circle,
-                          color: TraceColors.navyBlue,
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              const Spacer(flex: 1),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: TraceColors.gold.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'ID: ${_student!.studentId}',
-                  style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: TraceColors.navyBlue,
-                    letterSpacing: 2,
+                const Spacer(flex: 1),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: TraceColors.gold.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'ID: ${_student!.studentId}',
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: TraceColors.navyBlue,
+                      letterSpacing: 2,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              const Divider(color: TraceColors.lightGrey),
-              const SizedBox(height: 16),
-              GoldButton(
-                label: 'View Attendance Summary',
-                icon: Icons.analytics_outlined,
-                fullWidth: true,
-                onPressed: () =>
-                    context.push('/student/summary/${_student!.studentId}'),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         Positioned(
@@ -385,7 +455,9 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.student.name);
-    _selectedSection = widget.student.section.isNotEmpty ? widget.student.section : null;
+    _selectedSection = widget.student.section.isNotEmpty
+        ? widget.student.section
+        : null;
   }
 
   @override
@@ -595,7 +667,10 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
               Expanded(
                 flex: 5,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
                   decoration: BoxDecoration(
                     color: TraceColors.offWhite,
                     borderRadius: BorderRadius.circular(12),

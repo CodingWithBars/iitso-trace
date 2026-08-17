@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
+import 'package:universal_html/html.dart' as html;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -24,6 +27,7 @@ class WebStudentIdScreen extends ConsumerStatefulWidget {
 class _WebStudentIdScreenState extends ConsumerState<WebStudentIdScreen> {
   Student? _student;
   bool _isLoading = true;
+  final GlobalKey _cardKey = GlobalKey();
 
   @override
   void initState() {
@@ -70,6 +74,45 @@ class _WebStudentIdScreenState extends ConsumerState<WebStudentIdScreen> {
   void _logout() {
     ref.read(studentSessionProvider.notifier).logout();
     context.go('/');
+  }
+
+  Future<void> _shareQrCode() async {
+    try {
+      RenderRepaintBoundary boundary =
+          _cardKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+          
+      if (boundary.debugNeedsPaint) {
+        await Future.delayed(const Duration(milliseconds: 20));
+        return _shareQrCode();
+      }
+      
+      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      ByteData? byteData = await image.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
+      if (byteData != null) {
+        final buffer = byteData.buffer.asUint8List();
+
+        final blob = html.Blob([buffer]);
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        final anchor = html.AnchorElement(href: url)
+          ..setAttribute("download", "Trace_ID_${_student!.studentId}.png")
+          ..click();
+        html.Url.revokeObjectUrl(url);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to save QR code: $e',
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.red.shade800,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -132,13 +175,38 @@ class _WebStudentIdScreenState extends ConsumerState<WebStudentIdScreen> {
               child: CustomScrollView(
                 slivers: [
                   SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 20,
+                    ),
                     sliver: SliverFillRemaining(
                       hasScrollBody: false,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Expanded(child: _buildIdCard()),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: GoldButton(
+                                  label: 'Download QR',
+                                  icon: Icons.download_rounded,
+                                  onPressed: _shareQrCode,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: GoldButton(
+                                  label: 'Attendance',
+                                  icon: Icons.analytics_outlined,
+                                  onPressed: () => context.push(
+                                    '/student/summary/${_student!.studentId}',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                           _buildNoteWidget(),
                         ],
                       ),
@@ -156,135 +224,128 @@ class _WebStudentIdScreenState extends ConsumerState<WebStudentIdScreen> {
   Widget _buildIdCard() {
     return Stack(
       children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: TraceColors.gold, width: 2),
-            boxShadow: [
-              BoxShadow(
-                color: TraceColors.navyBlue.withValues(alpha: 0.15),
-                blurRadius: 30,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 96,
-                    height: 96,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: TraceColors.gold, width: 3),
-                      color: TraceColors.offWhite,
+        RepaintBoundary(
+          key: _cardKey,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: TraceColors.gold, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: TraceColors.navyBlue.withValues(alpha: 0.15),
+                  blurRadius: 30,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 96,
+                      height: 96,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: TraceColors.gold, width: 3),
+                        color: TraceColors.offWhite,
+                      ),
+                      child: ClipOval(
+                        child: _buildAvatarWidget(_student!.avatarUrl),
+                      ),
                     ),
-                    child: ClipOval(
-                      child: _buildAvatarWidget(_student!.avatarUrl),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _student!.name.toUpperCase(),
+                            style: GoogleFonts.inter(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: TraceColors.navyBlue,
+                              height: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            '${_student!.course} - ${_student!.yearLevel}${_student!.section.isNotEmpty ? ' - Sec ${_student!.section}' : ''}',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: TraceColors.medGrey,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _student!.name.toUpperCase(),
-                          style: GoogleFonts.inter(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Divider(color: TraceColors.lightGrey),
+                const Spacer(flex: 1),
+                Expanded(
+                  flex: 4,
+                  child: Center(
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        maxWidth: 288,
+                        maxHeight: 288,
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: TraceColors.lightGrey.withValues(alpha: 0.5),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: AspectRatio(
+                        aspectRatio: 1.0,
+                        child: QrImageView(
+                          data: _student!.qrHash,
+                          version: QrVersions.auto,
+                          eyeStyle: const QrEyeStyle(
+                            eyeShape: QrEyeShape.square,
                             color: TraceColors.navyBlue,
-                            height: 1.2,
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          '${_student!.course} - ${_student!.yearLevel}${_student!.section.isNotEmpty ? ' - Sec ${_student!.section}' : ''}',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: TraceColors.medGrey,
+                          dataModuleStyle: const QrDataModuleStyle(
+                            dataModuleShape: QrDataModuleShape.circle,
+                            color: TraceColors.navyBlue,
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Divider(color: TraceColors.lightGrey),
-              const Spacer(flex: 1),
-              Expanded(
-                flex: 4,
-                child: Center(
-                  child: Container(
-                    constraints: const BoxConstraints(
-                      maxWidth: 288,
-                      maxHeight: 288,
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: TraceColors.lightGrey.withValues(alpha: 0.5),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: AspectRatio(
-                      aspectRatio: 1.0,
-                      child: QrImageView(
-                        data: _student!.qrHash,
-                        version: QrVersions.auto,
-                        eyeStyle: const QrEyeStyle(
-                          eyeShape: QrEyeShape.square,
-                          color: TraceColors.navyBlue,
-                        ),
-                        dataModuleStyle: const QrDataModuleStyle(
-                          dataModuleShape: QrDataModuleShape.circle,
-                          color: TraceColors.navyBlue,
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              const Spacer(flex: 1),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: TraceColors.gold.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'ID: ${_student!.studentId}',
-                  style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: TraceColors.navyBlue,
-                    letterSpacing: 2,
+                const Spacer(flex: 1),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: TraceColors.gold.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'ID: ${_student!.studentId}',
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: TraceColors.navyBlue,
+                      letterSpacing: 2,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              const Divider(color: TraceColors.lightGrey),
-              const SizedBox(height: 16),
-              GoldButton(
-                label: 'View Attendance Summary',
-                icon: Icons.analytics_outlined,
-                fullWidth: true,
-                onPressed: () =>
-                    context.push('/student/summary/${_student!.studentId}'),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         Positioned(
@@ -377,7 +438,9 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.student.name);
-    _selectedSection = widget.student.section.isNotEmpty ? widget.student.section : null;
+    _selectedSection = widget.student.section.isNotEmpty
+        ? widget.student.section
+        : null;
   }
 
   @override
@@ -414,7 +477,12 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       String? newAvatarUrl;
       if (_pickedBytes != null) {
         try {
-          newAvatarUrl = await StudentService.uploadAvatar(_pickedBytes!, widget.student.studentId) ?? _pickedBase64;
+          newAvatarUrl =
+              await StudentService.uploadAvatar(
+                _pickedBytes!,
+                widget.student.studentId,
+              ) ??
+              _pickedBase64;
         } catch (_) {
           newAvatarUrl = _pickedBase64;
         }
@@ -440,7 +508,10 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
         Navigator.pop(context);
         widget.onSaved(updated);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile updated!'), backgroundColor: TraceColors.success),
+          const SnackBar(
+            content: Text('Profile updated!'),
+            backgroundColor: TraceColors.success,
+          ),
         );
       }
     } catch (e) {
@@ -452,15 +523,25 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   }
 
   Widget _avatarPreview() {
-    if (_pickedBytes != null) return Image.memory(_pickedBytes!, fit: BoxFit.cover);
+    if (_pickedBytes != null)
+      return Image.memory(_pickedBytes!, fit: BoxFit.cover);
     final url = widget.student.avatarUrl;
-    if (url.isEmpty) return const Icon(Icons.person, size: 40, color: TraceColors.lightGrey);
+    if (url.isEmpty)
+      return const Icon(Icons.person, size: 40, color: TraceColors.lightGrey);
     if (url.startsWith('data:image')) {
       try {
-        return Image.memory(base64Decode(url.split(',').last), fit: BoxFit.cover);
+        return Image.memory(
+          base64Decode(url.split(',').last),
+          fit: BoxFit.cover,
+        );
       } catch (_) {}
     }
-    return Image.network(url, fit: BoxFit.cover, errorBuilder: (_, _, _) => const Icon(Icons.person, size: 40, color: TraceColors.lightGrey));
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) =>
+          const Icon(Icons.person, size: 40, color: TraceColors.lightGrey),
+    );
   }
 
   @override
@@ -480,11 +561,21 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
             child: Container(
               width: 40,
               height: 4,
-              decoration: BoxDecoration(color: TraceColors.lightGrey, borderRadius: BorderRadius.circular(2)),
+              decoration: BoxDecoration(
+                color: TraceColors.lightGrey,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
           const SizedBox(height: 20),
-          Text('Edit Profile', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: TraceColors.navyBlue)),
+          Text(
+            'Edit Profile',
+            style: GoogleFonts.inter(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: TraceColors.navyBlue,
+            ),
+          ),
           const SizedBox(height: 24),
           Center(
             child: GestureDetector(
@@ -492,16 +583,30 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
               child: Stack(
                 children: [
                   Container(
-                    width: 100, height: 100,
-                    decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: TraceColors.gold, width: 3), color: TraceColors.offWhite),
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: TraceColors.gold, width: 3),
+                      color: TraceColors.offWhite,
+                    ),
                     child: ClipOval(child: _avatarPreview()),
                   ),
                   Positioned(
-                    bottom: 0, right: 0,
+                    bottom: 0,
+                    right: 0,
                     child: Container(
-                      width: 30, height: 30,
-                      decoration: const BoxDecoration(color: TraceColors.gold, shape: BoxShape.circle),
-                      child: const Icon(Icons.camera_alt, size: 16, color: TraceColors.navyBlue),
+                      width: 30,
+                      height: 30,
+                      decoration: const BoxDecoration(
+                        color: TraceColors.gold,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt,
+                        size: 16,
+                        color: TraceColors.navyBlue,
+                      ),
                     ),
                   ),
                 ],
@@ -509,15 +614,33 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
             ),
           ),
           const SizedBox(height: 24),
-          Text('Full Name', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: TraceColors.medGrey)),
+          Text(
+            'Full Name',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: TraceColors.medGrey,
+            ),
+          ),
           const SizedBox(height: 6),
           TextField(
             controller: _nameCtrl,
             decoration: InputDecoration(
               hintText: 'Enter full name',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: TraceColors.navyBlue, width: 2)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                  color: TraceColors.navyBlue,
+                  width: 2,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
             ),
             style: GoogleFonts.inter(fontSize: 15, color: TraceColors.navyBlue),
           ),
@@ -530,20 +653,46 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Student ID', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: TraceColors.medGrey)),
+                    Text(
+                      'Student ID',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: TraceColors.medGrey,
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     TextField(
-                      controller: TextEditingController(text: widget.student.studentId),
+                      controller: TextEditingController(
+                        text: widget.student.studentId,
+                      ),
                       enabled: false,
                       decoration: InputDecoration(
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: TraceColors.lightGrey.withValues(alpha: 0.5))),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        disabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: TraceColors.lightGrey.withValues(alpha: 0.5),
+                          ),
+                        ),
                         fillColor: TraceColors.lightGrey.withValues(alpha: 0.1),
                         filled: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        suffixIcon: const Icon(Icons.lock_outline, color: TraceColors.medGrey, size: 18),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        suffixIcon: const Icon(
+                          Icons.lock_outline,
+                          color: TraceColors.medGrey,
+                          size: 18,
+                        ),
                       ),
-                      style: GoogleFonts.inter(fontSize: 15, color: TraceColors.medGrey),
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        color: TraceColors.medGrey,
+                      ),
                     ),
                   ],
                 ),
@@ -554,7 +703,14 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Section', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: TraceColors.medGrey)),
+                    Text(
+                      'Section',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: TraceColors.medGrey,
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
                       initialValue: _selectedSection,
@@ -575,7 +731,9 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                         ),
                       ),
                       items: ['A', 'B', 'C']
-                          .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                          .map(
+                            (s) => DropdownMenuItem(value: s, child: Text(s)),
+                          )
                           .toList(),
                       onChanged: (v) => setState(() => _selectedSection = v),
                     ),
@@ -586,7 +744,10 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
           ),
           if (_generalError != null) ...[
             const SizedBox(height: 8),
-            Text(_generalError!, style: GoogleFonts.inter(fontSize: 13, color: TraceColors.error)),
+            Text(
+              _generalError!,
+              style: GoogleFonts.inter(fontSize: 13, color: TraceColors.error),
+            ),
           ],
           const SizedBox(height: 28),
           SizedBox(
@@ -596,11 +757,27 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: TraceColors.navyBlue,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
               child: _isSaving
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : Text('Save Changes', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(
+                      'Save Changes',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
             ),
           ),
         ],

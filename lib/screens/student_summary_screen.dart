@@ -11,6 +11,7 @@ import '../models/attendance.dart';
 import '../models/event.dart';
 import '../services/event_service.dart';
 import 'dart:convert';
+import '../services/checkout_warning_service.dart';
 import 'student/student_finances_tab.dart';
 
 class StudentSummaryScreen extends ConsumerStatefulWidget {
@@ -134,8 +135,15 @@ class _StudentSummaryScreenState extends ConsumerState<StudentSummaryScreen> {
   }
 
   Widget _buildResults() {
+    final pendingCheckout = CheckoutWarningService.checkPendingCheckout(_attendance, _events);
+    Widget? warningBanner;
+    if (pendingCheckout != null) {
+      warningBanner = CheckoutWarningService.processWarning(context, pendingCheckout);
+    }
+
     return Column(
       children: [
+        if (warningBanner != null) warningBanner,
         // Student info card
         Container(
           padding: const EdgeInsets.all(20),
