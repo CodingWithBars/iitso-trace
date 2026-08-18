@@ -101,11 +101,9 @@ class _StudentIdScreenState extends ConsumerState<StudentIdScreen> {
         await file.writeAsBytes(buffer);
 
         if (mounted) {
-          final box = context.findRenderObject() as RenderBox?;
           await Share.shareXFiles(
             [XFile(file.path)],
             text: 'My Trace QR Code ID',
-            sharePositionOrigin: box!.localToGlobal(Offset.zero) & box.size,
           );
         }
       }

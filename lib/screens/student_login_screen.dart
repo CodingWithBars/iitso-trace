@@ -526,8 +526,8 @@ class _StudentLoginScreenState extends ConsumerState<StudentLoginScreen> {
                   ),
                 ),
                 Positioned(
-                  top: -40,
-                  child: Image.asset('assets/iitso-logo.png', height: 200),
+                  top: -70,
+                  child: Image.asset('assets/iitso-logo.png', height: 130),
                 ),
               ],
             ),

@@ -99,7 +99,7 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
         title: const Text('Generate Sanctions'),
         content: Text(
           event.sanctionAmount != null && event.sanctionAmount! > 0
-              ? 'This will generate sanctions for every student who missed hours (Absent, Incomplete, or Late), with prorated fines calculated automatically up to a maximum of ₱${event.sanctionAmount!.toStringAsFixed(2)}. Continue?'
+              ? 'Absent students will be fined the full amount (₱${event.sanctionAmount!.toStringAsFixed(2)}), while Late and Incomplete students will be fined half (₱${(event.sanctionAmount! / 2).toStringAsFixed(2)}). Continue?'
               : 'This will create a non-monetary sanction record (${event.sanctionDescription}) for every student NOT in attendance. Continue?',
         ),
         actions: [
@@ -121,6 +121,48 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
         SnackBar(
           content: Text('$count sanction record(s) created for absent students.', style: const TextStyle(color: Colors.white)),
           backgroundColor: count > 0 ? TraceColors.error : TraceColors.medGrey,
+        ),
+      );
+    }
+  }
+
+  Future<void> _clearSanctions() async {
+    final event = _event;
+    if (event == null) return;
+    final role = ref.read(adminRoleProvider).value;
+    if (role != 'superadmin' && role != 'admin') {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Permission denied.', style: TextStyle(color: Colors.white)), backgroundColor: TraceColors.error),
+        );
+      }
+      return;
+    }
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear Generated Sanctions'),
+        content: const Text('This will delete all auto-generated sanction records for this event. Are you sure?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: TraceColors.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Clear', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed != true || !mounted) return;
+    
+    final count = await FinancialService.clearEventSanctions(event.id);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$count sanction record(s) cleared.', style: const TextStyle(color: Colors.white)),
+          backgroundColor: TraceColors.success,
         ),
       );
     }
@@ -557,6 +599,7 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
                               if (value == 'excused') _bulkMarkStatus('Excused');
                               if (value == 'absent') _bulkMarkStatus('Absent');
                               if (value == 'sanctions') _applySanctions();
+                              if (value == 'clear_sanctions') _clearSanctions();
                               if (value == 'contributions') _applyContributions();
                             },
                             itemBuilder: (context) => [
@@ -569,11 +612,16 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
                                 child: Text('Mark Missing as Absent', style: GoogleFonts.inter(fontSize: 13)),
                               ),
                               if ((_event!.sanctionAmount ?? 0) > 0 ||
-                                  (_event!.sanctionDescription?.isNotEmpty ?? false))
+                                  (_event!.sanctionDescription?.isNotEmpty ?? false)) ...[
                                 PopupMenuItem(
                                   value: 'sanctions',
                                   child: Text('Generate Sanctions (Absent/Incomplete/Late)', style: GoogleFonts.inter(fontSize: 13, color: TraceColors.error)),
                                 ),
+                                PopupMenuItem(
+                                  value: 'clear_sanctions',
+                                  child: Text('Clear Generated Sanctions', style: GoogleFonts.inter(fontSize: 13, color: TraceColors.error)),
+                                ),
+                              ],
                               if ((_event!.eventContribution ?? 0) > 0)
                                 PopupMenuItem(
                                   value: 'contributions',

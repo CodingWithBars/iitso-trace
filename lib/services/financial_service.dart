@@ -60,9 +60,53 @@ class FinancialService {
     }
   }
 
+  /// Stream paginated student obligations
+  static Stream<QuerySnapshot> streamObligations({int limit = 50}) {
+    return _db
+        .collection('student_obligations')
+        .orderBy('created_at', descending: true)
+        .limit(limit)
+        .snapshots();
+  }
+
+  /// Fetch all obligations for a specific student
+  static Future<List<StudentObligation>> getStudentObligations(String studentId) async {
+    try {
+      final snap = await _db
+          .collection('student_obligations')
+          .where('student_id', isEqualTo: studentId)
+          .get();
+      final list = snap.docs.map((doc) => StudentObligation.fromMap(doc.data(), doc.id)).toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    } catch (e) {
+      debugPrint('[FinancialService] Error fetching student obligations: $e');
+      return [];
+    }
+  }
+
   /// Add a single student obligation/sanction
   static Future<void> createObligation(StudentObligation obligation) async {
     await _db.collection('student_obligations').add(obligation.toMap());
+  }
+
+  /// Clears all generated sanctions for a specific event
+  static Future<int> clearEventSanctions(String eventId) async {
+    final snap = await _db
+        .collection('student_obligations')
+        .where('event_id', isEqualTo: eventId)
+        .where('type', isEqualTo: 'sanction')
+        .get();
+    
+    if (snap.docs.isEmpty) return 0;
+
+    final batch = _db.batch();
+    for (var doc in snap.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
+    
+    return snap.docs.length;
   }
 
   /// Batch assign obligation (e.g., Membership fee or Event contribution) to multiple students
@@ -388,31 +432,14 @@ class FinancialService {
            amount = hasMonetary ? event.sanctionAmount! : 0.0;
            title = 'Absent: ${event.eventName}';
            remarks = 'Invalid/Voided scans for ${event.eventName}';
-        } else if (hasMonetary && (status == 'LATE' || status == 'INCOMPLETE')) {
-          final totalHours = det.totalEventDuration.inMinutes / 60.0;
-          if (totalHours > 0) {
-            final missedHours = det.missedDuration.inMinutes / 60.0;
-            if (missedHours > 0) {
-              amount = (missedHours / totalHours) * event.sanctionAmount!;
-              
-              if (amount > 0 && amount < 5.0) {
-                // Minimum 5 pesos penalty for any incomplete time
-                amount = 5.0;
-              } else {
-                // Round to nearest multiple of 5 for clean currency amounts
-                amount = (amount / 5.0).round() * 5.0;
-              }
-              
-              if (amount > event.sanctionAmount!) amount = event.sanctionAmount!;
-              
-              if (amount > 0) {
-                createObligation = true;
-                final isLate = status == 'LATE';
-                title = isLate ? 'Late: ${event.eventName}' : 'Incomplete: ${event.eventName}';
-                remarks = '${isLate ? 'Late' : 'Incomplete'} penalty for missed hours (${missedHours.toStringAsFixed(1)} hrs)';
-              }
-            }
-          }
+        } else if (status == 'LATE' || status == 'INCOMPLETE') {
+          createObligation = true;
+          amount = hasMonetary ? (event.sanctionAmount! / 2.0) : 0.0;
+          final isLate = status == 'LATE';
+          title = isLate ? 'Late: ${event.eventName}' : 'Incomplete: ${event.eventName}';
+          remarks = hasNonMonetary 
+              ? '${isLate ? 'Late' : 'Incomplete'} penalty: ${event.sanctionDescription}'
+              : 'Penalty for ${isLate ? 'late' : 'incomplete'} attendance';
         }
       }
 
