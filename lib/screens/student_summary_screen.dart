@@ -143,7 +143,7 @@ class _StudentSummaryScreenState extends ConsumerState<StudentSummaryScreen> {
 
     return Column(
       children: [
-        if (warningBanner != null) warningBanner,
+        ?warningBanner,
         // Student info card
         Container(
           padding: const EdgeInsets.all(20),

@@ -10,7 +10,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:gal/gal.dart';
 import '../theme/app_theme.dart';
 import '../widgets/shared_widgets.dart';
 import '../services/student_service.dart';
@@ -101,10 +101,23 @@ class _StudentIdScreenState extends ConsumerState<StudentIdScreen> {
         await file.writeAsBytes(buffer);
 
         if (mounted) {
-          await Share.shareXFiles(
-            [XFile(file.path)],
-            text: 'My Trace QR Code ID',
-          );
+          final hasAccess = await Gal.hasAccess();
+          if (!hasAccess) {
+            await Gal.requestAccess();
+          }
+          await Gal.putImage(file.path);
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'QR Code saved to gallery',
+                  style: TextStyle(color: Colors.white),
+                ),
+                backgroundColor: TraceColors.success,
+              ),
+            );
+          }
         }
       }
     } catch (e) {

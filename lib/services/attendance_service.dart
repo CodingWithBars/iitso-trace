@@ -170,6 +170,7 @@ class AttendanceService {
     bool isOfflineMode = false,
     List<Student>? offlineStudents,
     Map<String, Map<String, dynamic>>? offlineAttendance,
+    DateTime? manualTime,
   }) async {
     try {
       Student? student;
@@ -238,7 +239,7 @@ class AttendanceService {
         }
       }
 
-      final now = DateTime.now();
+      final now = manualTime ?? DateTime.now();
       final isLate = isLateForPhase(phase, now, event);
 
       if (attendanceData == null) {

@@ -22,8 +22,6 @@ class CheckoutWarningService {
     List<Attendance> attendanceList,
     Map<String, Event> eventsMap,
   ) {
-    final now = DateTime.now();
-
     for (final att in attendanceList) {
       final event = eventsMap[att.eventId];
       if (event == null || event.status == 'completed' || event.status == 'archived') continue;
@@ -54,7 +52,6 @@ class CheckoutWarningService {
   /// Processes the warning: Schedules a local notification and optionally returns a Modal widget
   static Widget? processWarning(BuildContext context, PendingCheckout pending) {
     final now = DateTime.now();
-    final fiveMinsBefore = pending.targetCheckoutTime.subtract(const Duration(minutes: 5));
 
     // Schedule local notification 
     // It is safe to call this repeatedly, flutter_local_notifications will just overwrite the same ID
@@ -65,8 +62,8 @@ class CheckoutWarningService {
     );
 
     // Should we show the In-App Modal?
-    // Show if we are exactly at the 5 min mark, or if we have passed the 5 min mark but haven't passed the end time by too much (e.g. 2 hours)
-    if (now.isAfter(fiveMinsBefore) && now.isBefore(pending.targetCheckoutTime.add(const Duration(hours: 2)))) {
+    // Show if we have passed the target checkout time and they still haven't checked out
+    if (now.isAfter(pending.targetCheckoutTime) && now.isBefore(pending.targetCheckoutTime.add(const Duration(hours: 4)))) {
       return _buildWarningBanner(pending);
     }
 
@@ -115,7 +112,7 @@ class CheckoutWarningService {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Your ${pending.sessionName} session for "${pending.event.eventName}" is ending in 5 minutes. Go to the scanner and Time-Out immediately, or your hours will be voided!',
+                  'Your ${pending.sessionName} session for "${pending.event.eventName}" has ended, but you have not logged out yet. Please Time-Out immediately to avoid being marked as Incomplete!',
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     color: TraceColors.white.withValues(alpha: 0.9),

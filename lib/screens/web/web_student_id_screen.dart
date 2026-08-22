@@ -95,7 +95,7 @@ class _WebStudentIdScreenState extends ConsumerState<WebStudentIdScreen> {
 
         final blob = html.Blob([buffer]);
         final url = html.Url.createObjectUrlFromBlob(blob);
-        final anchor = html.AnchorElement(href: url)
+        html.AnchorElement(href: url)
           ..setAttribute("download", "Trace_ID_${_student!.studentId}.png")
           ..click();
         html.Url.revokeObjectUrl(url);
@@ -523,11 +523,13 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   }
 
   Widget _avatarPreview() {
-    if (_pickedBytes != null)
+    if (_pickedBytes != null) {
       return Image.memory(_pickedBytes!, fit: BoxFit.cover);
+    }
     final url = widget.student.avatarUrl;
-    if (url.isEmpty)
+    if (url.isEmpty) {
       return const Icon(Icons.person, size: 40, color: TraceColors.lightGrey);
+    }
     if (url.startsWith('data:image')) {
       try {
         return Image.memory(

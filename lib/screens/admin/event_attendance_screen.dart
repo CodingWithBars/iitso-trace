@@ -37,7 +37,7 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
 
   String _searchQuery = '';
   String _selectedYear = 'All';
-  String _statusFilter = 'All'; // 'All', 'Present', 'Pending', 'Absent', 'Late', 'Excused'
+  String _statusFilter = 'All'; // 'All', 'Present', 'Pending', 'Absent', 'Late', 'Excused', 'Incomplete'
   final List<String> _years = ['All', '1st Year', '2nd Year', '3rd Year', '4th Year'];
 
   @override
@@ -301,6 +301,88 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
     }
   }
 
+  ScanPhase _determinePhaseForTime(Event event, bool isTimeIn, DateTime time) {
+    if (event.isWholeDay) {
+      if (time.hour < 13) {
+        return isTimeIn ? ScanPhase.timeInAm : ScanPhase.timeOutAm;
+      } else {
+        return isTimeIn ? ScanPhase.timeInPm : ScanPhase.timeOutPm;
+      }
+    } else if (event.isPmOnly) {
+      return isTimeIn ? ScanPhase.timeInPm : ScanPhase.timeOutPm;
+    } else {
+      return isTimeIn ? ScanPhase.timeInAm : ScanPhase.timeOutAm;
+    }
+  }
+
+  Future<void> _manualTimeLog(
+    String sId,
+    Map<String, dynamic> studentData,
+    bool isTimeIn,
+  ) async {
+    if (_event == null) return;
+    final qrHash = studentData['qr_hash'];
+    if (qrHash == null || qrHash.toString().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot log manually: Student has no QR hash.', style: TextStyle(color: Colors.white)), backgroundColor: TraceColors.error),
+      );
+      return;
+    }
+
+    final selectedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: false),
+          child: child!,
+        );
+      },
+    );
+
+    if (selectedTime == null) return; // User cancelled
+
+    final now = DateTime.now();
+    final manualTime = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      selectedTime.hour,
+      selectedTime.minute,
+    );
+
+    setState(() => _isLoading = true);
+
+    try {
+      final phase = _determinePhaseForTime(_event!, isTimeIn, manualTime);
+      final result = await AttendanceService.processScan(
+        qrHash: qrHash,
+        event: _event!,
+        phase: phase,
+        isOfflineMode: false,
+        manualTime: manualTime,
+      );
+
+      if (mounted) {
+        final success = (result.status == ScanResultStatus.timeInSuccess || result.status == ScanResultStatus.timeOutSuccess || result.status == ScanResultStatus.lateEntry);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message ?? 'Status: ${result.status.name}', style: const TextStyle(color: Colors.white)),
+            backgroundColor: success ? TraceColors.success : TraceColors.error,
+          ),
+        );
+      }
+      await _fetchData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e', style: const TextStyle(color: Colors.white)), backgroundColor: TraceColors.error),
+        );
+      }
+      setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _bulkMarkStatus(String status) async {
     if (_event == null) return;
     
@@ -442,8 +524,9 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
         if (_statusFilter == 'Absent' && attStatus != 'absent') continue;
         if (_statusFilter == 'Late' && attStatus != 'late') continue;
         if (_statusFilter == 'Excused' && attStatus != 'excused') continue;
+        if (_statusFilter == 'Incomplete' && attStatus != 'incomplete') continue;
         if (_statusFilter == 'Present') {
-          if (attStatus == 'pending' || attStatus == 'absent' || attStatus == 'late' || attStatus == 'excused') {
+          if (attStatus == 'pending' || attStatus == 'absent' || attStatus == 'late' || attStatus == 'excused' || attStatus == 'incomplete') {
             continue;
           }
         }
@@ -486,6 +569,9 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
         ),
       );
     }
+
+    final role = ref.watch(adminRoleProvider).value;
+    final isSuperAdmin = role == 'superadmin' || role == 'president' || role == 'vice_president' || role == 'secretary';
 
     final totals = _getYearTotals();
     final totalStudents = _getYearTotalStudents();
@@ -721,7 +807,7 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
-                        children: ['All', 'Present', 'Pending', 'Absent', 'Late', 'Excused'].map((status) {
+                        children: ['All', 'Present', 'Pending', 'Absent', 'Late', 'Excused', 'Incomplete'].map((status) {
                           final isSelected = _statusFilter == status;
                           Color activeColor;
                           switch (status) {
@@ -730,6 +816,7 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
                             case 'Absent': activeColor = TraceColors.error; break;
                             case 'Late': activeColor = Colors.orange; break;
                             case 'Excused': activeColor = Colors.yellow.shade700; break;
+                            case 'Incomplete': activeColor = Colors.deepOrange; break;
                             default: activeColor = TraceColors.navyBlue;
                           }
 
@@ -883,6 +970,7 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
                                       case 'ABSENT': statusColor = TraceColors.error; break;
                                       case 'LATE': statusColor = Colors.orange; break;
                                       case 'EXCUSED': statusColor = Colors.yellow.shade700; break;
+                                      case 'INCOMPLETE': statusColor = Colors.deepOrange; break;
                                       case 'PRESENT':
                                       default: statusColor = TraceColors.success;
                                     }
@@ -912,12 +1000,26 @@ class _EventAttendanceScreenState extends ConsumerState<EventAttendanceScreen> {
                               PopupMenuButton<String>(
                                 icon: const Icon(Icons.more_vert_rounded, color: TraceColors.navyBlue, size: 20),
                                 tooltip: 'Update Status',
-                                onSelected: (val) => _markIndividualStatus(sId, studentData, val, item.attendance),
+                                onSelected: (val) {
+                                  if (val == 'ManualTimeIn') {
+                                    _manualTimeLog(sId, studentData, true);
+                                  } else if (val == 'ManualTimeOut') {
+                                    _manualTimeLog(sId, studentData, false);
+                                  } else {
+                                    _markIndividualStatus(sId, studentData, val, item.attendance);
+                                  }
+                                },
                                 itemBuilder: (context) => [
                                   PopupMenuItem(value: 'Present', child: Text('Mark Present', style: GoogleFonts.inter(fontSize: 13))),
                                   PopupMenuItem(value: 'Absent', child: Text('Mark Absent', style: GoogleFonts.inter(fontSize: 13))),
                                   PopupMenuItem(value: 'Excused', child: Text('Mark Excused', style: GoogleFonts.inter(fontSize: 13))),
                                   PopupMenuItem(value: 'Late', child: Text('Mark Late', style: GoogleFonts.inter(fontSize: 13))),
+                                  PopupMenuItem(value: 'Incomplete', child: Text('Mark Incomplete', style: GoogleFonts.inter(fontSize: 13))),
+                                  if (isSuperAdmin) ...[
+                                    const PopupMenuDivider(),
+                                    PopupMenuItem(value: 'ManualTimeIn', child: Text('Manual Time In', style: GoogleFonts.inter(fontSize: 13, color: TraceColors.royalBlue))),
+                                    PopupMenuItem(value: 'ManualTimeOut', child: Text('Manual Time Out (Logout)', style: GoogleFonts.inter(fontSize: 13, color: TraceColors.royalBlue))),
+                                  ],
                                 ],
                               ),
                             ],
